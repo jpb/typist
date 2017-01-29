@@ -21,20 +21,12 @@ main =
         }
 
 
-
--- SUBSCRIPTIONS
-
-
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Sub.map TutorMsg (Tutor.subscriptions model.tutor)
         , Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
         ]
-
-
-
--- MODEL
 
 
 type alias Model =
@@ -50,10 +42,6 @@ init =
       }
     , Cmd.none
     )
-
-
-
--- UPDATE
 
 
 type Msg
@@ -72,11 +60,7 @@ update msg model =
                 ( repoSearch, repoCmds ) =
                     RepoSearch.update repoSearchMsg model.repoSearch
             in
-                ({ model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoCmds)
-
-
-
--- VIEW
+                ( { model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoCmds )
 
 
 view : Model -> Html Msg

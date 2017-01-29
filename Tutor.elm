@@ -39,10 +39,6 @@ subscriptions model =
         Sub.none
 
 
-
--- MODEL
-
-
 init : String -> Model
 init text =
     { content = ""
@@ -64,10 +60,6 @@ type alias Model =
     , keysPressed : Set ( Int, Int )
     , state : State
     }
-
-
-
--- UPDATE
 
 
 type Msg
@@ -103,29 +95,40 @@ keyPressResult model keyCoordinates =
                         model.charIndex == String.length currentLine
 
                     isLastLine =
-                        ( model.lineIndex + 1 ) == Array.length model.lines
+                        (model.lineIndex + 1) == Array.length model.lines
 
                     isLastChar =
-                        ( model.charIndex + 1 ) == String.length currentLine
+                        (model.charIndex + 1) == String.length currentLine
 
                     isCurrentChar =
                         current == String.fromChar char
                 in
                     if isNewLine then
-                        if (Tuple.first keyCoordinates) == 13 then AdvanceLine else Error
+                        if (Tuple.first keyCoordinates) == 13 then
+                            AdvanceLine
+                        else
+                            Error
                     else if isCurrentChar then
                         if (Set.member char leftShiftChars) then
                             if (Set.member ( 16, 1 ) model.keysPressed) then
-                                if isLastChar && isLastLine then Complete else AdvanceChar
+                                if isLastChar && isLastLine then
+                                    Complete
+                                else
+                                    AdvanceChar
                             else
                                 Error
                         else if Set.member char rightShiftChars then
                             if Set.member ( 16, 2 ) model.keysPressed then
-                                if isLastChar && isLastLine then Complete else AdvanceChar
+                                if isLastChar && isLastLine then
+                                    Complete
+                                else
+                                    AdvanceChar
                             else
                                 Error
+                        else if isLastChar && isLastLine then
+                            Complete
                         else
-                            if isLastChar && isLastLine then Complete else AdvanceChar
+                            AdvanceChar
                     else
                         Error
             )
@@ -168,10 +171,6 @@ update msg model =
                 Noop ->
                     model
             )
-
-
-
--- VIEW
 
 
 actionButton model =

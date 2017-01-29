@@ -11,7 +11,7 @@ import Autocomplete
 init : Model
 init =
     { query = ""
-    , repos = [ Repo "Search..." "" ]
+    , repos = [ Repo "" "" ]
     , autocomplete = Autocomplete.empty
     , focused = False
     }
@@ -145,7 +145,8 @@ viewConfig =
 view : Model -> Html Msg
 view model =
     div []
-        [ Html.map
+        [ input [ onFocus Focus, onBlur Blur ] []
+        , Html.map
             AutocompleteUpdate
             (Autocomplete.view
                 viewConfig
@@ -153,5 +154,4 @@ view model =
                 model.autocomplete
                 model.repos
             )
-        , input [ onFocus Focus, onBlur Blur ] []
         ]
