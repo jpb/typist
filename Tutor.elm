@@ -2,7 +2,6 @@ module Tutor exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, p, strong)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onInput, on)
 import String
 import Json.Decode as Json
 import Keyboard
@@ -22,6 +21,17 @@ leftShiftChars =
 
 
 -- MODEL
+
+
+init : String -> Model
+init text =
+    { content = ""
+    , lineIndex = 0
+    , charIndex = 0
+    , lines = Array.fromList (String.lines text)
+    , errors = 0
+    , keysPressed = Set.empty
+    }
 
 
 type alias Model =
@@ -72,9 +82,15 @@ keyPressResult model keyCoordinates =
                     in
                         if current == String.fromChar char then
                             if Set.member char leftShiftChars then
-                                if Set.member ( 16, 1 ) model.keysPressed then AdvanceChar else Error
+                                if Set.member ( 16, 1 ) model.keysPressed then
+                                    AdvanceChar
+                                else
+                                    Error
                             else if Set.member char rightShiftChars then
-                                if Set.member ( 16, 2 ) model.keysPressed then AdvanceChar else Error
+                                if Set.member ( 16, 2 ) model.keysPressed then
+                                    AdvanceChar
+                                else
+                                    Error
                             else
                                 AdvanceChar
                         else

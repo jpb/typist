@@ -8,6 +8,7 @@ import Json.Decode as Json
 import Keyboard
 import Set exposing (Set)
 import Tutor
+import RepoSearch
 import Array
 
 
@@ -39,19 +40,14 @@ subscriptions model =
 
 type alias Model =
     { tutor : Tutor.Model
+    , repoSearch : RepoSearch.Model
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { tutor =
-            { content = ""
-            , lineIndex = 0
-            , charIndex = 0
-            , lines = Array.fromList ["Here's to the crazy ones,", "the misfits"]
-            , errors = 0
-            , keysPressed = Set.empty
-            }
+    ( { tutor = Tutor.init "Here's to the crazy ones,\n the misfits"
+      , repoSearch = RepoSearch.init
       }
     , Cmd.none
     )
@@ -63,6 +59,7 @@ init =
 
 type Msg
     = TutorMsg Tutor.Msg
+    | RepoSearchMsg RepoSearch.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -70,6 +67,13 @@ update msg model =
     case msg of
         TutorMsg tutorMsg ->
             ( { model | tutor = (Tutor.update tutorMsg model.tutor) }, Cmd.none )
+
+        RepoSearchMsg repoSearchMsg ->
+            let
+                ( repoSearch, repoCmds ) =
+                    RepoSearch.update repoSearchMsg model.repoSearch
+            in
+                ({ model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoCmds)
 
 
 
@@ -79,4 +83,6 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ (Html.map TutorMsg (Tutor.view model.tutor)) ]
+        [ (Html.map TutorMsg (Tutor.view model.tutor))
+        , (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
+        ]
