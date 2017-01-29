@@ -1,6 +1,6 @@
 module Tutor exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, p)
+import Html exposing (Html, Attribute, div, input, text, p, strong)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, on)
 import String
@@ -9,6 +9,7 @@ import Keyboard
 import Set exposing (Set)
 import Char
 import Tuple
+import Array exposing (Array)
 
 
 rightShiftChars =
@@ -25,8 +26,9 @@ leftShiftChars =
 
 type alias Model =
     { content : String
-    , text : String
-    , index : Int
+    , lines : Array String
+    , lineIndex : Int
+    , charIndex : Int
     , errors : Int
     , keysPressed : Set ( Int, Int )
     }
@@ -42,24 +44,44 @@ type Msg
     | KeyPress Keyboard.KeyCoordinates
 
 
-isValidKeyPress : Model -> ( Int, Int ) -> Bool
-isValidKeyPress model keyCoordinates =
-    let
-        current =
-            String.slice model.index (model.index + 1) model.text
+type KeyPressResult
+    = AdvanceChar
+    | AdvanceLine
+    | Error
+    | Noop
 
-        char =
-            (Char.fromCode (Tuple.first keyCoordinates))
-    in
-        if current == String.fromChar char then
-            if Set.member char leftShiftChars then
-                Set.member ( 16, 1 ) model.keysPressed
-            else if Set.member char rightShiftChars then
-                Set.member ( 16, 2 ) model.keysPressed
-            else
-                True
-        else
-            False
+
+keyPressResult : Model -> ( Int, Int ) -> KeyPressResult
+keyPressResult model keyCoordinates =
+    Maybe.withDefault Noop
+        (Maybe.map
+            (\currentLine ->
+                if model.charIndex == String.length currentLine then
+                    if (Tuple.first keyCoordinates) == 13 then
+                        -- Enter
+                        AdvanceLine
+                    else
+                        Error
+                else
+                    let
+                        current =
+                            String.slice model.charIndex (model.charIndex + 1) currentLine
+
+                        char =
+                            (Char.fromCode (Tuple.first keyCoordinates))
+                    in
+                        if current == String.fromChar char then
+                            if Set.member char leftShiftChars then
+                                if Set.member ( 16, 1 ) model.keysPressed then AdvanceChar else Error
+                            else if Set.member char rightShiftChars then
+                                if Set.member ( 16, 2 ) model.keysPressed then AdvanceChar else Error
+                            else
+                                AdvanceChar
+                        else
+                            Error
+            )
+            (Array.get model.lineIndex model.lines)
+        )
 
 
 update : Msg -> Model -> Model
@@ -72,10 +94,19 @@ update msg model =
             { model | keysPressed = Set.remove keyCoordinates model.keysPressed }
 
         KeyPress keyCoordinates ->
-            if isValidKeyPress model keyCoordinates then
-                { model | index = model.index + 1 }
-            else
-                { model | errors = model.errors + 1 }
+            (case keyPressResult model keyCoordinates of
+                AdvanceChar ->
+                    { model | charIndex = model.charIndex + 1 }
+
+                AdvanceLine ->
+                    { model | lineIndex = model.lineIndex + 1, charIndex = 0 }
+
+                Error ->
+                    { model | errors = model.errors + 1 }
+
+                Noop ->
+                    model
+            )
 
 
 
@@ -84,19 +115,37 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    let
-        written =
-            String.slice 0 model.index model.text
+    case Array.get model.lineIndex model.lines of
+        Just currentLine ->
+            let
+                previousLines =
+                    Array.toList (Array.slice 0 model.lineIndex model.lines)
 
-        current =
-            String.slice model.index (model.index + 1) model.text
+                pendingLines =
+                    Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
 
-        pending =
-            String.slice (model.index + 1) (String.length model.text) model.text
-    in
-        div []
-            [ p [] [ text "Errors: ", text (toString model.errors) ]
-            , p [] [ text written ]
-            , p [] [ text current ]
-            , p [] [ text pending ]
-            ]
+                previousChars =
+                    String.slice 0 model.charIndex currentLine
+
+                currentChar =
+                    String.slice model.charIndex (model.charIndex + 1) currentLine
+
+                pendingChars =
+                    String.slice (model.charIndex + 1) (String.length currentLine) currentLine
+            in
+                div []
+                    (List.concat
+                        [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
+                        , List.map (\l -> p [] [ text l ]) previousLines
+                        , [ p []
+                                [ text previousChars
+                                , strong [] [ text currentChar ]
+                                , text pendingChars
+                                ]
+                          ]
+                        , List.map (\l -> p [] [ text l ]) pendingLines
+                        ]
+                    )
+
+        Nothing ->
+            div [] [ text "Done!" ]

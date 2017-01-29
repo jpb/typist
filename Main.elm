@@ -8,6 +8,7 @@ import Json.Decode as Json
 import Keyboard
 import Set exposing (Set)
 import Tutor
+import Array
 
 
 main =
@@ -45,8 +46,9 @@ init : ( Model, Cmd Msg )
 init =
     ( { tutor =
             { content = ""
-            , index = 0
-            , text = "Here's to the crazy ones, the misfits"
+            , lineIndex = 0
+            , charIndex = 0
+            , lines = Array.fromList ["Here's to the crazy ones,", "the misfits"]
             , errors = 0
             , keysPressed = Set.empty
             }
