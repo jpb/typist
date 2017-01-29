@@ -1,4 +1,4 @@
-effect module Keyboard where { subscription = MySub } exposing
+effect module KeyboardWithLocation where { subscription = MySub } exposing
   ( KeyCoordinates
   , presses, downs, ups
   )

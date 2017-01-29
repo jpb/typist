@@ -1,21 +1,35 @@
 module RepoSearch exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (class, classList)
+import Html.Events exposing (onInput, onFocus, onBlur)
 import Json.Decode as Decode
 import Http
+import Autocomplete
 
 
 init : Model
 init =
     { query = ""
-    , repos = []
+    , repos = [ Repo "Search..." "" ]
+    , autocomplete = Autocomplete.empty
+    , focused = False
     }
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    if model.focused then
+        Sub.map AutocompleteUpdate Autocomplete.subscription
+    else
+        Sub.none
 
 
 type alias Model =
     { query : String
     , repos : List Repo
+    , autocomplete : Autocomplete.State
+    , focused : Bool
     }
 
 
@@ -27,8 +41,11 @@ type alias Repo =
 
 type Msg
     = QueryChanged String
+    | AutocompleteUpdate Autocomplete.Msg
     | LoadRepos (Result Http.Error (List Repo))
-    | Select String
+    | SelectRepo String
+    | Focus
+    | Blur
 
 
 fetchRepos : String -> Cmd Msg
@@ -47,6 +64,25 @@ decodeRepos =
         Decode.at [ "items" ] (Decode.list decodeRepo)
 
 
+updateConfig : Autocomplete.UpdateConfig Msg Repo
+updateConfig =
+    Autocomplete.updateConfig
+        { toId = .name
+        , onKeyDown =
+            \code maybeId ->
+                if code == 13 then
+                    Maybe.map SelectRepo maybeId
+                else
+                    Maybe.map QueryChanged maybeId
+        , onTooLow = Nothing
+        , onTooHigh = Nothing
+        , onMouseEnter = \_ -> Nothing
+        , onMouseLeave = \_ -> Nothing
+        , onMouseClick = \id -> Just <| SelectRepo id
+        , separateSelections = False
+        }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -56,7 +92,7 @@ update msg model =
             else
                 ( model, Cmd.none )
 
-        Select repoName ->
+        SelectRepo repoName ->
             ( model, Cmd.none )
 
         LoadRepos response ->
@@ -67,17 +103,55 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        AutocompleteUpdate autoMsg ->
+            let
+                ( newState, maybeMsg ) =
+                    Autocomplete.update updateConfig autoMsg 5 model.autocomplete model.repos
+
+                newModel =
+                    { model | autocomplete = newState }
+            in
+                case maybeMsg of
+                    Nothing ->
+                        newModel ! []
+
+                    Just updateMsg ->
+                        update updateMsg newModel
+
+        Focus ->
+            ( { model | focused = True }, Cmd.none )
+
+        Blur ->
+            ( { model | focused = False }, Cmd.none )
+
+
+viewConfig : Autocomplete.ViewConfig Repo
+viewConfig =
+    let
+        customizedLi keySelected mouseSelected repo =
+            { attributes = [ classList [ ( "autocomplete-item", True ), ( "is-selected", keySelected || mouseSelected ) ] ]
+            , children = [ text repo.name ]
+            }
+    in
+        Autocomplete.viewConfig
+            { toId = .name
+            , ul =
+                [ class "autocomplete-list" ]
+            , li =
+                customizedLi
+            }
+
 
 view : Model -> Html Msg
 view model =
     div []
-        (List.concat
-            [ [ input [ onInput QueryChanged ] [] ]
-            , [ ul []
-                    (List.map
-                        (\r -> li [] [ text r.name ])
-                        model.repos
-                    )
-              ]
-            ]
-        )
+        [ Html.map
+            AutocompleteUpdate
+            (Autocomplete.view
+                viewConfig
+                5
+                model.autocomplete
+                model.repos
+            )
+        , input [ onFocus Focus, onBlur Blur ] []
+        ]

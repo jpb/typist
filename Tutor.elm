@@ -1,10 +1,11 @@
 module Tutor exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, p, strong)
+import Html exposing (Html, Attribute, div, input, text, p, strong, button)
 import Html.Attributes exposing (..)
+import Html.Events exposing (onClick)
 import String
 import Json.Decode as Json
-import Keyboard
+import KeyboardWithLocation as Keyboard
 import Set exposing (Set)
 import Char
 import Tuple
@@ -19,6 +20,25 @@ leftShiftChars =
     Set.fromList [ 'Y', 'U', 'I', 'O', 'P', 'H', 'J', 'K', 'L', 'N', 'M', '~', '!', '@', '#', '$', '%', '{', '}', '|', ':', '"', '<', '>', '?' ]
 
 
+type State
+    = Initial
+    | Running
+    | Paused
+    | Finished
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    if model.state == Running then
+        Sub.batch
+            [ Keyboard.downs KeyDown
+            , Keyboard.ups KeyUp
+            , Keyboard.presses KeyPress
+            ]
+    else
+        Sub.none
+
+
 
 -- MODEL
 
@@ -31,6 +51,7 @@ init text =
     , lines = Array.fromList (String.lines text)
     , errors = 0
     , keysPressed = Set.empty
+    , state = Initial
     }
 
 
@@ -41,6 +62,7 @@ type alias Model =
     , charIndex : Int
     , errors : Int
     , keysPressed : Set ( Int, Int )
+    , state : State
     }
 
 
@@ -52,6 +74,9 @@ type Msg
     = KeyDown Keyboard.KeyCoordinates
     | KeyUp Keyboard.KeyCoordinates
     | KeyPress Keyboard.KeyCoordinates
+    | Start
+    | Pause
+    | Resume
 
 
 type KeyPressResult
@@ -103,6 +128,15 @@ keyPressResult model keyCoordinates =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
+        Start ->
+            { model | state = Running }
+
+        Pause ->
+            { model | state = Paused }
+
+        Resume ->
+            { model | state = Running }
+
         KeyDown keyCoordinates ->
             { model | keysPressed = Set.insert keyCoordinates model.keysPressed }
 
@@ -129,39 +163,53 @@ update msg model =
 -- VIEW
 
 
+actionButton model =
+    case model.state of
+        Initial ->
+            [ button [ onClick Start ] [ text "Start" ] ]
+
+        Running ->
+            [ button [ onClick Pause ] [ text "Pause" ] ]
+
+        Paused ->
+            [ button [ onClick Resume ] [ text "Resume" ] ]
+
+        Finished ->
+            []
+
+
 view : Model -> Html Msg
 view model =
-    case Array.get model.lineIndex model.lines of
-        Just currentLine ->
-            let
-                previousLines =
-                    Array.toList (Array.slice 0 model.lineIndex model.lines)
+    let
+        currentLine =
+            Maybe.withDefault "" (Array.get model.lineIndex model.lines)
 
-                pendingLines =
-                    Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
+        previousLines =
+            Array.toList (Array.slice 0 model.lineIndex model.lines)
 
-                previousChars =
-                    String.slice 0 model.charIndex currentLine
+        pendingLines =
+            Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
 
-                currentChar =
-                    String.slice model.charIndex (model.charIndex + 1) currentLine
+        previousChars =
+            String.slice 0 model.charIndex currentLine
 
-                pendingChars =
-                    String.slice (model.charIndex + 1) (String.length currentLine) currentLine
-            in
-                div []
-                    (List.concat
-                        [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
-                        , List.map (\l -> p [] [ text l ]) previousLines
-                        , [ p []
-                                [ text previousChars
-                                , strong [] [ text currentChar ]
-                                , text pendingChars
-                                ]
-                          ]
-                        , List.map (\l -> p [] [ text l ]) pendingLines
+        currentChar =
+            String.slice model.charIndex (model.charIndex + 1) currentLine
+
+        pendingChars =
+            String.slice (model.charIndex + 1) (String.length currentLine) currentLine
+    in
+        div []
+            (List.concat
+                [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
+                , actionButton model
+                , List.map (\l -> p [] [ text l ]) previousLines
+                , [ p []
+                        [ text previousChars
+                        , strong [] [ text currentChar ]
+                        , text pendingChars
                         ]
-                    )
-
-        Nothing ->
-            div [] [ text "Done!" ]
+                  ]
+                , List.map (\l -> p [] [ text l ]) pendingLines
+                ]
+            )

@@ -5,7 +5,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, on)
 import String
 import Json.Decode as Json
-import Keyboard
+import KeyboardWithLocation as Keyboard
 import Set exposing (Set)
 import Tutor
 import RepoSearch
@@ -28,9 +28,8 @@ main =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Keyboard.downs (\i -> TutorMsg (Tutor.KeyDown i))
-        , Keyboard.ups (\i -> TutorMsg (Tutor.KeyUp i))
-        , Keyboard.presses (\i -> TutorMsg (Tutor.KeyPress i))
+        [ Sub.map TutorMsg (Tutor.subscriptions model.tutor)
+        , Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
         ]
 
 
@@ -46,7 +45,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { tutor = Tutor.init "Here's to the crazy ones,\n the misfits"
+    ( { tutor = Tutor.init "Here's to the crazy ones,\nthe misfits"
       , repoSearch = RepoSearch.init
       }
     , Cmd.none
