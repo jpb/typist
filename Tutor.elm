@@ -83,6 +83,7 @@ type KeyPressResult
     = AdvanceChar
     | AdvanceLine
     | Error
+    | Complete
     | Noop
 
 
@@ -91,35 +92,42 @@ keyPressResult model keyCoordinates =
     Maybe.withDefault Noop
         (Maybe.map
             (\currentLine ->
-                if model.charIndex == String.length currentLine then
-                    if (Tuple.first keyCoordinates) == 13 then
-                        -- Enter
-                        AdvanceLine
+                let
+                    current =
+                        String.slice model.charIndex (model.charIndex + 1) currentLine
+
+                    char =
+                        (Char.fromCode (Tuple.first keyCoordinates))
+
+                    isNewLine =
+                        model.charIndex == String.length currentLine
+
+                    isLastLine =
+                        ( model.lineIndex + 1 ) == Array.length model.lines
+
+                    isLastChar =
+                        ( model.charIndex + 1 ) == String.length currentLine
+
+                    isCurrentChar =
+                        current == String.fromChar char
+                in
+                    if isNewLine then
+                        if (Tuple.first keyCoordinates) == 13 then AdvanceLine else Error
+                    else if isCurrentChar then
+                        if (Set.member char leftShiftChars) then
+                            if (Set.member ( 16, 1 ) model.keysPressed) then
+                                if isLastChar && isLastLine then Complete else AdvanceChar
+                            else
+                                Error
+                        else if Set.member char rightShiftChars then
+                            if Set.member ( 16, 2 ) model.keysPressed then
+                                if isLastChar && isLastLine then Complete else AdvanceChar
+                            else
+                                Error
+                        else
+                            if isLastChar && isLastLine then Complete else AdvanceChar
                     else
                         Error
-                else
-                    let
-                        current =
-                            String.slice model.charIndex (model.charIndex + 1) currentLine
-
-                        char =
-                            (Char.fromCode (Tuple.first keyCoordinates))
-                    in
-                        if current == String.fromChar char then
-                            if Set.member char leftShiftChars then
-                                if Set.member ( 16, 1 ) model.keysPressed then
-                                    AdvanceChar
-                                else
-                                    Error
-                            else if Set.member char rightShiftChars then
-                                if Set.member ( 16, 2 ) model.keysPressed then
-                                    AdvanceChar
-                                else
-                                    Error
-                            else
-                                AdvanceChar
-                        else
-                            Error
             )
             (Array.get model.lineIndex model.lines)
         )
@@ -154,6 +162,9 @@ update msg model =
                 Error ->
                     { model | errors = model.errors + 1 }
 
+                Complete ->
+                    { model | lineIndex = model.lineIndex + 1, charIndex = 0, state = Finished }
+
                 Noop ->
                     model
             )
@@ -175,7 +186,7 @@ actionButton model =
             [ button [ onClick Resume ] [ text "Resume" ] ]
 
         Finished ->
-            []
+            [ text "Done!" ]
 
 
 view : Model -> Html Msg
