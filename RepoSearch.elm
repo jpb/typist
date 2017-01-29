@@ -11,7 +11,7 @@ import Autocomplete
 init : Model
 init =
     { query = ""
-    , repos = [ Repo "" "" ]
+    , repos = []
     , autocomplete = Autocomplete.empty
     , focused = False
     }
@@ -73,7 +73,7 @@ updateConfig =
                 if code == 13 then
                     Maybe.map SelectRepo maybeId
                 else
-                    Maybe.map QueryChanged maybeId
+                    Nothing
         , onTooLow = Nothing
         , onTooHigh = Nothing
         , onMouseEnter = \_ -> Nothing
@@ -87,7 +87,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         QueryChanged query ->
-            if String.length query > 2 then
+            if query /= model.query && String.length query > 2 then
                 ( { model | query = query }, fetchRepos query )
             else
                 ( model, Cmd.none )
@@ -103,17 +103,17 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
-        AutocompleteUpdate autoMsg ->
+        AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autoMsg 5 model.autocomplete model.repos
+                    Autocomplete.update updateConfig autocompleteMsg 5 model.autocomplete model.repos
 
                 newModel =
                     { model | autocomplete = newState }
             in
                 case maybeMsg of
                     Nothing ->
-                        newModel ! []
+                        ( newModel, Cmd.none )
 
                     Just updateMsg ->
                         update updateMsg newModel
@@ -145,7 +145,7 @@ viewConfig =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ onFocus Focus, onBlur Blur ] []
+        [ input [ onInput QueryChanged, onFocus Focus, onBlur Blur ] []
         , Html.map
             AutocompleteUpdate
             (Autocomplete.view
