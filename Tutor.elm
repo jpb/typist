@@ -10,6 +10,10 @@ import Set exposing (Set)
 import Char
 import Tuple
 import Array exposing (Array)
+import Http
+import Json.Decode as Decode
+import Base64
+import Regex
 
 
 rightShiftChars =
@@ -39,15 +43,22 @@ subscriptions model =
         Sub.none
 
 
-init : String -> Model
-init text =
+init : Model
+init =
     { content = ""
     , lineIndex = 0
     , charIndex = 0
-    , lines = Array.fromList (String.lines text)
+    , lines = Array.empty
     , errors = 0
     , keysPressed = Set.empty
     , state = Initial
+    , file = File "" ""
+    }
+
+
+type alias File =
+    { path : String
+    , content : String
     }
 
 
@@ -59,6 +70,7 @@ type alias Model =
     , errors : Int
     , keysPressed : Set ( Int, Int )
     , state : State
+    , file : File
     }
 
 
@@ -66,6 +78,8 @@ type Msg
     = KeyDown Keyboard.KeyCoordinates
     | KeyUp Keyboard.KeyCoordinates
     | KeyPress Keyboard.KeyCoordinates
+    | SetFile String String
+    | LoadContent (Result Http.Error String)
     | Start
     | Pause
     | Resume
@@ -136,23 +150,39 @@ keyPressResult model keyCoordinates =
         )
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Start ->
-            { model | state = Running }
+            ( { model | state = Running }, Cmd.none )
 
         Pause ->
-            { model | state = Paused }
+            ( { model | state = Paused }, Cmd.none )
 
         Resume ->
-            { model | state = Running }
+            ( { model | state = Running }, Cmd.none )
+
+        SetFile path url ->
+            ( { model | file = (File path url) }, fetchContent url )
+
+        LoadContent response ->
+            case response of
+                Ok base64Content ->
+                    case (Base64.decode (Regex.replace Regex.All (Regex.regex "\\n") (\_ -> "") base64Content)) of
+                        Ok content ->
+                            ( { model | lines = (Array.fromList (String.lines content)) }, Cmd.none )
+
+                        Err _ ->
+                            ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         KeyDown keyCoordinates ->
-            { model | keysPressed = Set.insert keyCoordinates model.keysPressed }
+            ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
 
         KeyUp keyCoordinates ->
-            { model | keysPressed = Set.remove keyCoordinates model.keysPressed }
+            ( { model | keysPressed = Set.remove keyCoordinates model.keysPressed }, Cmd.none )
 
         KeyPress keyCoordinates ->
             (case keyPressResult model keyCoordinates of
@@ -171,6 +201,15 @@ update msg model =
                 Noop ->
                     model
             )
+                ! []
+
+
+fetchContent : String -> Cmd Msg
+fetchContent url =
+    Http.send LoadContent
+        (Http.get url
+            (Decode.at [ "content" ] Decode.string)
+        )
 
 
 actionButton model =

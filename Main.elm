@@ -7,9 +7,10 @@ import String
 import Json.Decode as Json
 import KeyboardWithLocation as Keyboard
 import Set exposing (Set)
+import Array
 import Tutor
 import RepoSearch
-import Array
+import FileSearch
 
 
 main =
@@ -26,19 +27,30 @@ subscriptions model =
     Sub.batch
         [ Sub.map TutorMsg (Tutor.subscriptions model.tutor)
         , Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
+        , Sub.map FileSearchMsg (FileSearch.subscriptions model.fileSearch)
         ]
+
+
+type Stage
+    = RepoSearch
+    | FileSearch
+    | Tutor
 
 
 type alias Model =
     { tutor : Tutor.Model
     , repoSearch : RepoSearch.Model
+    , fileSearch : FileSearch.Model
+    , stage : Stage
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { tutor = Tutor.init "Here's to the crazy ones,\nthe misfits"
+    ( { tutor = Tutor.init
       , repoSearch = RepoSearch.init
+      , fileSearch = FileSearch.init
+      , stage = RepoSearch
       }
     , Cmd.none
     )
@@ -47,25 +59,72 @@ init =
 type Msg
     = TutorMsg Tutor.Msg
     | RepoSearchMsg RepoSearch.Msg
+    | FileSearchMsg FileSearch.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         TutorMsg tutorMsg ->
-            ( { model | tutor = (Tutor.update tutorMsg model.tutor) }, Cmd.none )
+            let
+                ( updatedTutor, tutorCmd ) =
+                    Tutor.update tutorMsg model.tutor
+            in
+                ( { model | tutor = updatedTutor }, Cmd.map TutorMsg tutorCmd )
 
         RepoSearchMsg repoSearchMsg ->
-            let
-                ( repoSearch, repoCmds ) =
-                    RepoSearch.update repoSearchMsg model.repoSearch
-            in
-                ( { model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoCmds )
+            case repoSearchMsg of
+                RepoSearch.RepoSelected repo ->
+                    let
+                        ( updatedFileSearch, fileSearchCmd ) =
+                            FileSearch.update (FileSearch.SetRepo repo.name repo.branch) model.fileSearch
+                    in
+                        ( { model
+                            | stage = FileSearch
+                            , fileSearch = updatedFileSearch
+                          }
+                        , Cmd.map FileSearchMsg fileSearchCmd
+                        )
+
+                _ ->
+                    let
+                        ( repoSearch, repoSearchCmds ) =
+                            RepoSearch.update repoSearchMsg model.repoSearch
+                    in
+                        ( { model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoSearchCmds )
+
+        FileSearchMsg fileSearchMsg ->
+            case fileSearchMsg of
+                FileSearch.FileSelected file ->
+                    let
+                        ( updatedTutor, tutorCmd ) =
+                            Tutor.update (Tutor.SetFile file.path file.url) model.tutor
+                    in
+                        ( { model
+                            | stage = Tutor
+                            , tutor = updatedTutor
+                          }
+                        , Cmd.map TutorMsg tutorCmd
+                        )
+
+                _ ->
+                    let
+                        ( fileSearch, codeCmds ) =
+                            FileSearch.update fileSearchMsg model.fileSearch
+                    in
+                        ( { model | fileSearch = fileSearch }, Cmd.map FileSearchMsg codeCmds )
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ (Html.map TutorMsg (Tutor.view model.tutor))
-        , (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
+        [ case model.stage of
+            RepoSearch ->
+                (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
+
+            FileSearch ->
+                (Html.map FileSearchMsg (FileSearch.view model.fileSearch))
+
+            Tutor ->
+                (Html.map TutorMsg (Tutor.view model.tutor))
         ]

@@ -1,12 +1,12 @@
 module RepoSearch exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
-import Html.Attributes exposing (class, classList)
+import Html.Attributes exposing (class, classList, value)
 import Html.Events exposing (onInput, onFocus, onBlur)
 import Json.Decode as Decode
 import Http
 import Autocomplete
-
+import Common exposing (cmd)
 
 init : Model
 init =
@@ -14,15 +14,21 @@ init =
     , repos = []
     , autocomplete = Autocomplete.empty
     , focused = False
+    , selectedRepo = Nothing
     }
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.focused then
-        Sub.map AutocompleteUpdate Autocomplete.subscription
-    else
-        Sub.none
+    case model.selectedRepo of
+        Nothing ->
+            if model.focused then
+                Sub.map AutocompleteUpdate Autocomplete.subscription
+            else
+                Sub.none
+
+        Just _ ->
+            Sub.none
 
 
 type alias Model =
@@ -30,12 +36,13 @@ type alias Model =
     , repos : List Repo
     , autocomplete : Autocomplete.State
     , focused : Bool
+    , selectedRepo : Maybe Repo
     }
 
 
 type alias Repo =
     { name : String
-    , url : String
+    , branch : String
     }
 
 
@@ -44,6 +51,7 @@ type Msg
     | AutocompleteUpdate Autocomplete.Msg
     | LoadRepos (Result Http.Error (List Repo))
     | SelectRepo String
+    | RepoSelected Repo
     | Focus
     | Blur
 
@@ -57,9 +65,9 @@ decodeRepos : Decode.Decoder (List Repo)
 decodeRepos =
     let
         decodeRepo =
-            Decode.map2 (\n u -> { name = n, url = u })
+            Decode.map2 (\n b -> { name = n, branch = b })
                 (Decode.field "full_name" Decode.string)
-                (Decode.field "html_url" Decode.string)
+                (Decode.field "default_branch" Decode.string)
     in
         Decode.at [ "items" ] (Decode.list decodeRepo)
 
@@ -76,8 +84,8 @@ updateConfig =
                     Nothing
         , onTooLow = Nothing
         , onTooHigh = Nothing
-        , onMouseEnter = \_ -> Nothing
-        , onMouseLeave = \_ -> Nothing
+        , onMouseEnter = \id -> Nothing
+        , onMouseLeave = \id -> Nothing
         , onMouseClick = \id -> Just <| SelectRepo id
         , separateSelections = False
         }
@@ -87,12 +95,32 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         QueryChanged query ->
-            if query /= model.query && String.length query > 2 then
-                ( { model | query = query }, fetchRepos query )
-            else
-                ( model, Cmd.none )
+            case model.selectedRepo of
+                Nothing ->
+                    if query /= model.query && String.length query > 2 then
+                        ( { model | query = query }, fetchRepos query )
+                    else
+                        ( model, Cmd.none )
+
+                Just _ ->
+                    ( model, Cmd.none )
 
         SelectRepo repoName ->
+            let
+                selectedRepo =
+                    (List.head (List.filter (\r -> r.name == repoName) model.repos))
+
+                updatedModel =
+                    { model | selectedRepo = selectedRepo }
+            in
+                case selectedRepo of
+                    Just repo ->
+                        ( updatedModel, cmd (RepoSelected repo) )
+
+                    Nothing ->
+                        ( updatedModel, Cmd.none )
+
+        RepoSelected _ ->
             ( model, Cmd.none )
 
         LoadRepos response ->
@@ -145,7 +173,8 @@ viewConfig =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ onInput QueryChanged, onFocus Focus, onBlur Blur ] []
+        [ p [] [ text "Search for a repository on GitHub..." ]
+        , input [ onInput QueryChanged, onFocus Focus, onBlur Blur ] []
         , Html.map
             AutocompleteUpdate
             (Autocomplete.view
