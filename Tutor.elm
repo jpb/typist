@@ -14,6 +14,7 @@ import Http
 import Json.Decode as Decode
 import Base64
 import Regex
+import Time exposing (Time)
 
 
 rightShiftChars =
@@ -38,6 +39,7 @@ subscriptions model =
             [ Keyboard.downs KeyDown
             , Keyboard.ups KeyUp
             , Keyboard.presses KeyPress
+            , Time.every Time.second Tick
             ]
     else
         Sub.none
@@ -53,6 +55,7 @@ init =
     , keysPressed = Set.empty
     , state = Initial
     , file = File "" ""
+    , elapsedTime = 0
     }
 
 
@@ -71,6 +74,7 @@ type alias Model =
     , keysPressed : Set ( Int, Int )
     , state : State
     , file : File
+    , elapsedTime : Time
     }
 
 
@@ -80,6 +84,7 @@ type Msg
     | KeyPress Keyboard.KeyCoordinates
     | SetFile String String
     | LoadContent (Result Http.Error String)
+    | Tick Time
     | Start
     | Pause
     | Resume
@@ -153,6 +158,9 @@ keyPressResult model keyCoordinates =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Tick _ ->
+            ( { model | elapsedTime = model.elapsedTime + Time.second }, Cmd.none )
+
         Start ->
             ( { model | state = Running }, Cmd.none )
 
@@ -227,6 +235,28 @@ actionButton model =
             [ text "Done!" ]
 
 
+formatTime : Time -> String
+formatTime floatTime =
+    let
+        intTime =
+            (truncate (Time.inSeconds floatTime))
+
+        hours =
+            intTime // 3600
+
+        minutes =
+            (intTime - (hours * 3600)) // 60
+
+        seconds =
+            (intTime - (hours * 3600) - (minutes * 60))
+    in
+        (String.padLeft 2 '0' (toString hours))
+            ++ ":"
+            ++ (String.padLeft 2 '0' (toString))
+            ++ ":"
+            ++ (String.padLeft 2 '0' (toString seconds))
+
+
 view : Model -> Html Msg
 view model =
     let
@@ -252,6 +282,7 @@ view model =
             (List.concat
                 [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
                 , actionButton model
+                , [ text (formatTime model.elapsedTime) ]
                 , List.map (\l -> p [] [ text l ]) previousLines
                 , [ p []
                         [ text previousChars
