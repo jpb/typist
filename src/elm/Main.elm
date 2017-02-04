@@ -1,22 +1,16 @@
 module Main exposing (..)
 
-import Array
 import Components.FileSearch as FileSearch
 import Components.RepoSearch as RepoSearch
 import Components.Tutor as Tutor
-import CssFrameworks
-import CssFrameworks.Skeleton
 import Dom
-import Html exposing (Html, Attribute, div, input, text, program, p, button)
-import Html.Attributes exposing (..)
+import Html exposing (Html, Attribute, div, input, text, program, p, button, h1)
+import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
-import Json.Decode as Json
-import KeyboardWithLocation as Keyboard
-import Set exposing (Set)
-import String
 import Task
 
 
+main : Program Never Model Msg
 main =
     program
         { init = init
@@ -150,15 +144,23 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div [ class "container" ]
         (List.concat
-            [ [ CssFrameworks.toStyleNode CssFrameworks.Skeleton.skeleton ]
-            , case model.stage of
+            [ [ div [ class "row" ]
+                    [ h1 [] [ text "Typist" ] ]
+              ]
+            , (case model.stage of
                 RepoSearch ->
-                    [ (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch)) ]
+                    [ div [ class "row" ]
+                        [ p [] [ text "Search for a project on GitHub..." ] ]
+                    , (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
+                    ]
 
                 FileSearch ->
-                    [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
+                    [ div [ class "row" ]
+                        [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
+                        , p [] [ text "Search for a file..." ]
+                        ]
                     , (Html.map FileSearchMsg (FileSearch.view model.fileSearch))
                     ]
 
@@ -166,5 +168,6 @@ view model =
                     [ button [ onClick (NavigateTo FileSearch) ] [ text "↩" ]
                     , (Html.map TutorMsg (Tutor.view model.tutor))
                     ]
+              )
             ]
         )

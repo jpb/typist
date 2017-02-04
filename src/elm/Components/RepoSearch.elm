@@ -132,7 +132,7 @@ update msg model =
         AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autocompleteMsg 5 model.autocomplete model.repos
+                    Autocomplete.update updateConfig autocompleteMsg 10 model.autocomplete model.repos
 
                 newModel =
                     { model | autocomplete = newState }
@@ -155,7 +155,12 @@ viewConfig : Autocomplete.ViewConfig Repo
 viewConfig =
     let
         customizedLi keySelected mouseSelected repo =
-            { attributes = [ classList [ ( "autocomplete-item", True ), ( "is-selected", keySelected || mouseSelected ) ] ]
+            { attributes =
+                [ classList
+                    [ ( "autocomplete-item", True )
+                    , ( "autocomplete-item--selected", keySelected || mouseSelected )
+                    ]
+                ]
             , children = [ text repo.name ]
             }
     in
@@ -170,23 +175,25 @@ viewConfig =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ p [] [ text "Search for a repository on GitHub..." ]
-        , input
+    div [ class "row" ]
+        [ input
             [ onInput QueryChanged
             , onFocus Focus
             , onBlur Blur
             , defaultValue model.query
             , autofocus True
             , id "repo-search-query"
-            , classList [ ( "loading", model.loading ) ]
+            , classList
+                [ ( "autocomplete-input", True )
+                , ( "autocomplete-input--loading", model.loading )
+                ]
             ]
             []
         , Html.map
             AutocompleteUpdate
             (Autocomplete.view
                 viewConfig
-                5
+                10
                 model.autocomplete
                 model.repos
             )

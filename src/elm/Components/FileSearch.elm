@@ -143,7 +143,7 @@ update msg model =
         AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autocompleteMsg 5 model.autocomplete model.tree
+                    Autocomplete.update updateConfig autocompleteMsg 10 model.autocomplete model.tree
 
                 newModel =
                     { model | autocomplete = newState }
@@ -166,7 +166,12 @@ viewConfig : Autocomplete.ViewConfig File
 viewConfig =
     let
         customizedLi keySelected mouseSelected file =
-            { attributes = [ classList [ ( "autocomplete-item", True ), ( "is-selected", keySelected || mouseSelected ) ] ]
+            { attributes =
+                [ classList
+                    [ ( "autocomplete-item", True )
+                    , ( "autocomplete-item--selected", keySelected || mouseSelected )
+                    ]
+                ]
             , children = [ text file.path ]
             }
     in
@@ -192,25 +197,32 @@ view : Model -> Html Msg
 view model =
     case model.repo of
         Just repo ->
-            div []
-                [ p [] [ text ("Search for a file in " ++ repo ++ "...") ]
-                , input
-                    [ onInput QueryChanged
-                    , onFocus Focus
-                    , onBlur Blur
-                    , defaultValue model.query
-                    , autofocus True
-                    , id "file-search-query"
+            div [ class "row" ]
+                [ div []
+                    [ input
+                        [ onInput QueryChanged
+                        , onFocus Focus
+                        , onBlur Blur
+                        , defaultValue model.query
+                        , autofocus True
+                        , id "file-search-query"
+                        , classList
+                            [ ( "autocomplete-input", True )
+                            , ( "autocomplete-input--loading"
+                              , model.loading
+                              )
+                            ]
+                        ]
+                        []
+                    , Html.map
+                        AutocompleteUpdate
+                        (Autocomplete.view
+                            viewConfig
+                            10
+                            model.autocomplete
+                            (filterTree model.query model.tree)
+                        )
                     ]
-                    []
-                , Html.map
-                    AutocompleteUpdate
-                    (Autocomplete.view
-                        viewConfig
-                        5
-                        model.autocomplete
-                        (filterTree model.query model.tree)
-                    )
                 ]
 
         Nothing ->
