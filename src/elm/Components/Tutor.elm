@@ -3,8 +3,6 @@ module Components.Tutor exposing (..)
 import Array exposing (Array)
 import Base64
 import Char
-import Css exposing (backgroundColor)
-import Css.Colors exposing (red)
 import Dom
 import Html exposing (Html, Attribute, div, input, text, p, strong, button)
 import Html.Attributes exposing (..)
@@ -61,6 +59,7 @@ init =
     , file = File "" ""
     , elapsedTime = 0
     , loading = False
+    , charCount = 0
     }
 
 
@@ -81,6 +80,7 @@ type alias Model =
     , file : File
     , elapsedTime : Time
     , loading : Bool
+    , charCount : Int
     }
 
 
@@ -175,6 +175,7 @@ update msg model =
                 , elapsedTime = 0
                 , lineIndex = 0
                 , charIndex = 0
+                , charCount = 0
               }
             , Cmd.none
             )
@@ -191,7 +192,9 @@ update msg model =
             ( { model | state = Paused }, Cmd.none )
 
         Resume ->
-            ( { model | state = Running }, Cmd.none )
+            ( { model | state = Running }
+            , Task.attempt Blurred (Dom.blur "tutor-action-button")
+            )
 
         SetFile path url ->
             ( { model | file = (File path url), loading = True }, fetchContent url )
@@ -218,10 +221,17 @@ update msg model =
         KeyPress keyCoordinates ->
             (case keyPressResult model keyCoordinates of
                 AdvanceChar ->
-                    { model | charIndex = model.charIndex + 1 }
+                    { model
+                        | charIndex = model.charIndex + 1
+                        , charCount = model.charCount + 1
+                    }
 
                 AdvanceLine ->
-                    { model | lineIndex = model.lineIndex + 1, charIndex = 0 }
+                    { model
+                        | lineIndex = model.lineIndex + 1
+                        , charIndex = 0
+                        , charCount = model.charCount + 1
+                    }
 
                 Error ->
                     { model | errors = model.errors + 1 }
@@ -246,16 +256,16 @@ fetchContent url =
 actionButton model =
     case model.state of
         Initial ->
-            [ button [ onClick Start, id "tutor-action-button" ] [ text "Start" ] ]
+            button [ onClick Start, id "tutor-action-button" ] [ text "Start" ]
 
         Running ->
-            [ button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ] ]
+            button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ]
 
         Paused ->
-            [ button [ onClick Resume, id "tutor-action-button" ] [ text "Resume" ] ]
+            button [ onClick Resume, id "tutor-action-button" ] [ text "Resume" ]
 
         Finished ->
-            [ text "Done!" ]
+            text ("Done!" ++ (calculateCharsPerMinute model.elapsedTime model.charCount))
 
 
 formatTime : Time -> String
@@ -273,15 +283,22 @@ formatTime floatTime =
         seconds =
             (intTime - (hours * 3600) - (minutes * 60))
     in
-        (String.padLeft 2 '0' (toString hours))
-            ++ ":"
-            ++ (String.padLeft 2 '0' (toString minutes))
-            ++ ":"
-            ++ (String.padLeft 2 '0' (toString seconds))
+        if hours > 0 then
+            (toString hours)
+                ++ ":"
+                ++ (String.padLeft 2 '0' (toString minutes))
+                ++ ":"
+                ++ (String.padLeft 2 '0' (toString seconds))
+        else
+            (String.padLeft 2 '0' (toString minutes))
+                ++ ":"
+                ++ (String.padLeft 2 '0' (toString seconds))
 
 
-styles =
-    Css.asPairs >> Html.Attributes.style
+calculateCharsPerMinute : Time -> Int -> String
+calculateCharsPerMinute time charCount =
+    (toString (truncate ((Time.inSeconds time / (toFloat charCount)) * 60)))
+        ++ " characters / minute"
 
 
 view : Model -> Html Msg
@@ -299,30 +316,44 @@ view model =
                 Array.toList (Array.slice 0 model.lineIndex model.lines)
 
             pendingLines =
-                Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
+                Array.toList
+                    (Array.slice (model.lineIndex + 1)
+                        (Array.length model.lines)
+                        model.lines
+                    )
 
             previousChars =
                 String.slice 0 model.charIndex currentLine
 
             currentChar =
-                String.slice model.charIndex (model.charIndex + 1) currentLine
+                let
+                    currentChar_ =
+                        String.slice model.charIndex (model.charIndex + 1) currentLine
+                in
+                    if currentChar_ == "" then
+                        "¶"
+                    else
+                        currentChar_
 
             pendingChars =
                 String.slice (model.charIndex + 1) (String.length currentLine) currentLine
         in
             div [ class "row" ]
-                (List.concat
-                    [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
-                    , actionButton model
-                    , [ button [ onClick Reset ] [ text "Reset" ] ]
-                    , [ text (formatTime model.elapsedTime) ]
-                    , List.map (\l -> p [] [ text l ]) previousLines
-                    , [ p []
-                            [ text previousChars
-                            , strong [ styles [ backgroundColor red ] ] [ text currentChar ]
-                            , text pendingChars
-                            ]
-                      ]
-                    , List.map (\l -> p [] [ text l ]) pendingLines
-                    ]
-                )
+                [ p [] [ text "Errors: ", text (toString model.errors) ]
+                , actionButton model
+                , button [ onClick Reset ] [ text "Reset" ]
+                , p [] [ text (formatTime model.elapsedTime) ]
+                , p [] [ text (calculateCharsPerMinute model.elapsedTime model.charCount) ]
+                , div [ class "tutor-text" ]
+                    (List.concat
+                        [ List.map (\l -> p [] [ text (if l == "" then " " else l) ]) previousLines
+                        , [ p []
+                                [ text previousChars
+                                , strong [ class "tutor-active-char" ] [ text currentChar ]
+                                , text pendingChars
+                                ]
+                          ]
+                        , List.map (\l -> p [] [ text (if l == "" then " " else l) ]) pendingLines
+                        ]
+                    )
+                ]

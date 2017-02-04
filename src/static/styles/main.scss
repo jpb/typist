@@ -28,7 +28,21 @@
   border-bottom: 1px solid $border-color;
   margin: 0;
   padding: 10px;
+  cursor: pointer;
 }
 .autocomplete-item--selected {
+  background-color: $primary-color;
+}
+
+
+.tutor-text {
+  white-space: pre;
+  font-family: Monaco, monospaced;
+
+  p {
+    margin: 0;
+  }
+}
+.tutor-active-char {
   background-color: $primary-color;
 }
