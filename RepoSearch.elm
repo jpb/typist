@@ -1,12 +1,13 @@
 module RepoSearch exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
-import Html.Attributes exposing (class, classList, value)
+import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
 import Html.Events exposing (onInput, onFocus, onBlur)
 import Json.Decode as Decode
 import Http
 import Autocomplete
 import Common exposing (cmd)
+
 
 init : Model
 init =
@@ -20,15 +21,10 @@ init =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.selectedRepo of
-        Nothing ->
-            if model.focused then
-                Sub.map AutocompleteUpdate Autocomplete.subscription
-            else
-                Sub.none
-
-        Just _ ->
-            Sub.none
+    if model.focused then
+        Sub.map AutocompleteUpdate Autocomplete.subscription
+    else
+        Sub.none
 
 
 type alias Model =
@@ -174,7 +170,15 @@ view : Model -> Html Msg
 view model =
     div []
         [ p [] [ text "Search for a repository on GitHub..." ]
-        , input [ onInput QueryChanged, onFocus Focus, onBlur Blur ] []
+        , input
+            [ onInput QueryChanged
+            , onFocus Focus
+            , onBlur Blur
+            , defaultValue model.query
+            , autofocus True
+            , id "repo-search-query"
+            ]
+            []
         , Html.map
             AutocompleteUpdate
             (Autocomplete.view

@@ -1,12 +1,13 @@
 module FileSearch exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
-import Html.Attributes exposing (class, classList, value)
+import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
 import Html.Events exposing (onInput, onFocus, onBlur)
 import Json.Decode as Decode
 import Http
 import Autocomplete
 import Common exposing (cmd)
+
 
 init : Model
 init =
@@ -119,10 +120,10 @@ update msg model =
                 selectedFile =
                     (List.head (List.filter (\n -> n.path == filePath) model.tree))
             in
-
                 case selectedFile of
                     Just file ->
                         ( { model | selectedFile = selectedFile }, cmd (FileSelected file) )
+
                     Nothing ->
                         ( model, Cmd.none )
 
@@ -191,7 +192,15 @@ view model =
         Just repo ->
             div []
                 [ p [] [ text ("Search for a file in " ++ repo ++ "...") ]
-                , input [ onInput QueryChanged, onFocus Focus, onBlur Blur ] []
+                , input
+                    [ onInput QueryChanged
+                    , onFocus Focus
+                    , onBlur Blur
+                    , defaultValue model.query
+                    , autofocus True
+                    , id "file-search-query"
+                    ]
+                    []
                 , Html.map
                     AutocompleteUpdate
                     (Autocomplete.view

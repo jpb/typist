@@ -15,6 +15,8 @@ import Json.Decode as Decode
 import Base64
 import Regex
 import Time exposing (Time)
+import Css exposing (backgroundColor)
+import Css.Colors exposing (red)
 
 
 rightShiftChars =
@@ -88,6 +90,7 @@ type Msg
     | Start
     | Pause
     | Resume
+    | Reset
 
 
 type KeyPressResult
@@ -158,6 +161,16 @@ keyPressResult model keyCoordinates =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Reset ->
+            ( { model
+                | state = Initial
+                , elapsedTime = 0
+                , lineIndex = 0
+                , charIndex = 0
+              }
+            , Cmd.none
+            )
+
         Tick _ ->
             ( { model | elapsedTime = model.elapsedTime + Time.second }, Cmd.none )
 
@@ -252,9 +265,13 @@ formatTime floatTime =
     in
         (String.padLeft 2 '0' (toString hours))
             ++ ":"
-            ++ (String.padLeft 2 '0' (toString))
+            ++ (String.padLeft 2 '0' (toString minutes))
             ++ ":"
             ++ (String.padLeft 2 '0' (toString seconds))
+
+
+styles =
+    Css.asPairs >> Html.Attributes.style
 
 
 view : Model -> Html Msg
@@ -282,11 +299,12 @@ view model =
             (List.concat
                 [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
                 , actionButton model
+                , [ button [ onClick Reset ] [ text "Reset" ] ]
                 , [ text (formatTime model.elapsedTime) ]
                 , List.map (\l -> p [] [ text l ]) previousLines
                 , [ p []
                         [ text previousChars
-                        , strong [] [ text currentChar ]
+                        , strong [ styles [ backgroundColor red ] ] [ text currentChar ]
                         , text pendingChars
                         ]
                   ]

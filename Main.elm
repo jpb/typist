@@ -1,8 +1,8 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, program, p)
+import Html exposing (Html, Attribute, div, input, text, program, p, button)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onInput, on)
+import Html.Events exposing (onInput, onClick)
 import String
 import Json.Decode as Json
 import KeyboardWithLocation as Keyboard
@@ -11,6 +11,10 @@ import Array
 import Tutor
 import RepoSearch
 import FileSearch
+import CssFrameworks
+import CssFrameworks.Skeleton
+import Dom
+import Task
 
 
 main =
@@ -60,11 +64,36 @@ type Msg
     = TutorMsg Tutor.Msg
     | RepoSearchMsg RepoSearch.Msg
     | FileSearchMsg FileSearch.Msg
+    | NavigateTo Stage
+    | Focused (Result Dom.Error ())
+
+
+focusOn : String -> Cmd Msg
+focusOn id =
+    Task.attempt Focused (Dom.focus id)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Focused _ ->
+            ( model, Cmd.none )
+
+        NavigateTo stage ->
+            let
+                cmd =
+                    case stage of
+                        RepoSearch ->
+                            focusOn "repo-search-query"
+
+                        FileSearch ->
+                            focusOn "file-search-query"
+
+                        _ ->
+                            Cmd.none
+            in
+                ( { model | stage = stage }, cmd )
+
         TutorMsg tutorMsg ->
             let
                 ( updatedTutor, tutorCmd ) =
@@ -83,7 +112,11 @@ update msg model =
                             | stage = FileSearch
                             , fileSearch = updatedFileSearch
                           }
-                        , Cmd.map FileSearchMsg fileSearchCmd
+                        , (Cmd.batch
+                            [ focusOn "file-search-query"
+                            , Cmd.map FileSearchMsg fileSearchCmd
+                            ]
+                          )
                         )
 
                 _ ->
@@ -118,13 +151,20 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ case model.stage of
-            RepoSearch ->
-                (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
+        (List.concat
+            [ [ CssFrameworks.toStyleNode CssFrameworks.Skeleton.skeleton ]
+            , case model.stage of
+                RepoSearch ->
+                    [ (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch)) ]
 
-            FileSearch ->
-                (Html.map FileSearchMsg (FileSearch.view model.fileSearch))
+                FileSearch ->
+                    [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
+                    , (Html.map FileSearchMsg (FileSearch.view model.fileSearch))
+                    ]
 
-            Tutor ->
-                (Html.map TutorMsg (Tutor.view model.tutor))
-        ]
+                Tutor ->
+                    [ button [ onClick (NavigateTo FileSearch) ] [ text "↩" ]
+                    , (Html.map TutorMsg (Tutor.view model.tutor))
+                    ]
+            ]
+        )
