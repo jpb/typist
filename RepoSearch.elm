@@ -1,12 +1,12 @@
 module RepoSearch exposing (..)
 
+import Autocomplete
+import Common exposing (cmd)
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
 import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
 import Html.Events exposing (onInput, onFocus, onBlur)
-import Json.Decode as Decode
 import Http
-import Autocomplete
-import Common exposing (cmd)
+import Json.Decode as Decode
 
 
 init : Model

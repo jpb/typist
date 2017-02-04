@@ -1,20 +1,20 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, program, p, button)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onInput, onClick)
-import String
-import Json.Decode as Json
-import KeyboardWithLocation as Keyboard
-import Set exposing (Set)
 import Array
-import Tutor
-import RepoSearch
-import FileSearch
 import CssFrameworks
 import CssFrameworks.Skeleton
 import Dom
+import FileSearch
+import Html exposing (Html, Attribute, div, input, text, program, p, button)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onInput, onClick)
+import Json.Decode as Json
+import KeyboardWithLocation as Keyboard
+import RepoSearch
+import Set exposing (Set)
+import String
 import Task
+import Tutor
 
 
 main =
