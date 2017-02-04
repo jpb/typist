@@ -60,6 +60,7 @@ init =
     , state = Initial
     , file = File "" ""
     , elapsedTime = 0
+    , loading = False
     }
 
 
@@ -79,6 +80,7 @@ type alias Model =
     , state : State
     , file : File
     , elapsedTime : Time
+    , loading : Bool
     }
 
 
@@ -192,20 +194,20 @@ update msg model =
             ( { model | state = Running }, Cmd.none )
 
         SetFile path url ->
-            ( { model | file = (File path url) }, fetchContent url )
+            ( { model | file = (File path url), loading = True }, fetchContent url )
 
         LoadContent response ->
             case response of
                 Ok base64Content ->
                     case (Base64.decode (Regex.replace Regex.All (Regex.regex "\\n") (\_ -> "") base64Content)) of
                         Ok content ->
-                            ( { model | lines = (Array.fromList (String.lines content)) }, Cmd.none )
+                            ( { model | lines = (Array.fromList (String.lines content)), loading = False }, Cmd.none )
 
                         Err _ ->
-                            ( model, Cmd.none )
+                            ( { model | loading = False }, Cmd.none )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( { model | loading = False }, Cmd.none )
 
         KeyDown keyCoordinates ->
             ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
@@ -250,7 +252,7 @@ actionButton model =
             [ button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ] ]
 
         Paused ->
-            [ button [ onClick Resume, id "tutor-action-button"  ] [ text "Resume" ] ]
+            [ button [ onClick Resume, id "tutor-action-button" ] [ text "Resume" ] ]
 
         Finished ->
             [ text "Done!" ]
@@ -284,38 +286,43 @@ styles =
 
 view : Model -> Html Msg
 view model =
-    let
-        currentLine =
-            Maybe.withDefault "" (Array.get model.lineIndex model.lines)
+    if model.loading then
+        div [ class "row" ]
+            [ p [] [ text "Loading..." ]
+            ]
+    else
+        let
+            currentLine =
+                Maybe.withDefault "" (Array.get model.lineIndex model.lines)
 
-        previousLines =
-            Array.toList (Array.slice 0 model.lineIndex model.lines)
+            previousLines =
+                Array.toList (Array.slice 0 model.lineIndex model.lines)
 
-        pendingLines =
-            Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
+            pendingLines =
+                Array.toList (Array.slice (model.lineIndex + 1) (Array.length model.lines) model.lines)
 
-        previousChars =
-            String.slice 0 model.charIndex currentLine
+            previousChars =
+                String.slice 0 model.charIndex currentLine
 
-        currentChar =
-            String.slice model.charIndex (model.charIndex + 1) currentLine
+            currentChar =
+                String.slice model.charIndex (model.charIndex + 1) currentLine
 
-        pendingChars =
-            String.slice (model.charIndex + 1) (String.length currentLine) currentLine
-    in
-        div []
-            (List.concat
-                [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
-                , actionButton model
-                , [ button [ onClick Reset ] [ text "Reset" ] ]
-                , [ text (formatTime model.elapsedTime) ]
-                , List.map (\l -> p [] [ text l ]) previousLines
-                , [ p []
-                        [ text previousChars
-                        , strong [ styles [ backgroundColor red ] ] [ text currentChar ]
-                        , text pendingChars
-                        ]
-                  ]
-                , List.map (\l -> p [] [ text l ]) pendingLines
-                ]
-            )
+            pendingChars =
+                String.slice (model.charIndex + 1) (String.length currentLine) currentLine
+        in
+            div [ class "row" ]
+                (List.concat
+                    [ [ p [] [ text "Errors: ", text (toString model.errors) ] ]
+                    , actionButton model
+                    , [ button [ onClick Reset ] [ text "Reset" ] ]
+                    , [ text (formatTime model.elapsedTime) ]
+                    , List.map (\l -> p [] [ text l ]) previousLines
+                    , [ p []
+                            [ text previousChars
+                            , strong [ styles [ backgroundColor red ] ] [ text currentChar ]
+                            , text pendingChars
+                            ]
+                      ]
+                    , List.map (\l -> p [] [ text l ]) pendingLines
+                    ]
+                )
