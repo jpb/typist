@@ -1,4 +1,4 @@
-module RepoSearch exposing (..)
+module Components.RepoSearch exposing (..)
 
 import Autocomplete
 import Common exposing (cmd)
@@ -16,6 +16,7 @@ init =
     , autocomplete = Autocomplete.empty
     , focused = False
     , selectedRepo = Nothing
+    , loading = False
     }
 
 
@@ -33,6 +34,7 @@ type alias Model =
     , autocomplete : Autocomplete.State
     , focused : Bool
     , selectedRepo : Maybe Repo
+    , loading : Bool
     }
 
 
@@ -94,7 +96,7 @@ update msg model =
             case model.selectedRepo of
                 Nothing ->
                     if query /= model.query && String.length query > 2 then
-                        ( { model | query = query }, fetchRepos query )
+                        ( { model | query = query, loading = True }, fetchRepos query )
                     else
                         ( model, Cmd.none )
 
@@ -122,10 +124,10 @@ update msg model =
         LoadRepos response ->
             case response of
                 Ok repos ->
-                    ( { model | repos = repos }, Cmd.none )
+                    ( { model | repos = repos, loading = False }, Cmd.none )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( { model | loading = False }, Cmd.none )
 
         AutocompleteUpdate autocompleteMsg ->
             let
@@ -177,6 +179,7 @@ view model =
             , defaultValue model.query
             , autofocus True
             , id "repo-search-query"
+            , classList [ ( "loading", model.loading ) ]
             ]
             []
         , Html.map

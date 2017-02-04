@@ -1,20 +1,20 @@
 module Main exposing (..)
 
 import Array
+import Components.FileSearch as FileSearch
+import Components.RepoSearch as RepoSearch
+import Components.Tutor as Tutor
 import CssFrameworks
 import CssFrameworks.Skeleton
 import Dom
-import FileSearch
 import Html exposing (Html, Attribute, div, input, text, program, p, button)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import Json.Decode as Json
 import KeyboardWithLocation as Keyboard
-import RepoSearch
 import Set exposing (Set)
 import String
 import Task
-import Tutor
 
 
 main =

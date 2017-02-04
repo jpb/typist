@@ -1,4 +1,4 @@
-module FileSearch exposing (..)
+module Components.FileSearch exposing (..)
 
 import Autocomplete
 import Common exposing (cmd)
@@ -18,6 +18,7 @@ init =
     , focused = False
     , selectedFile = Nothing
     , repo = Nothing
+    , loading = False
     }
 
 
@@ -42,6 +43,7 @@ type alias Model =
     , focused : Bool
     , selectedFile : Maybe File
     , repo : Maybe String
+    , loading : Bool
     }
 
 
@@ -110,7 +112,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SetRepo repo branch ->
-            ( { model | repo = Just repo }, fetchTree repo branch )
+            ( { model | repo = Just repo, loading = True }, fetchTree repo branch )
 
         QueryChanged query ->
             ( { model | query = query }, Cmd.none )
@@ -133,10 +135,10 @@ update msg model =
         LoadTree response ->
             case response of
                 Ok tree ->
-                    ( { model | tree = tree }, Cmd.none )
+                    ( { model | tree = tree, loading = False }, Cmd.none )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( { model | loading = False }, Cmd.none )
 
         AutocompleteUpdate autocompleteMsg ->
             let

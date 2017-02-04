@@ -1,22 +1,24 @@
-module Tutor exposing (..)
+module Components.Tutor exposing (..)
 
+import Array exposing (Array)
+import Base64
+import Char
+import Css exposing (backgroundColor)
+import Css.Colors exposing (red)
+import Dom
 import Html exposing (Html, Attribute, div, input, text, p, strong, button)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
-import String
-import Json.Decode as Json
-import KeyboardWithLocation as Keyboard
-import Set exposing (Set)
-import Char
-import Tuple
-import Array exposing (Array)
 import Http
 import Json.Decode as Decode
-import Base64
+import Json.Decode as Json
+import KeyboardWithLocation as Keyboard
 import Regex
+import Set exposing (Set)
+import String
+import Task
 import Time exposing (Time)
-import Css exposing (backgroundColor)
-import Css.Colors exposing (red)
+import Tuple
 
 
 rightShiftChars =
@@ -91,6 +93,7 @@ type Msg
     | Pause
     | Resume
     | Reset
+    | Blurred (Result Dom.Error ())
 
 
 type KeyPressResult
@@ -161,6 +164,9 @@ keyPressResult model keyCoordinates =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Blurred _ ->
+            ( model, Cmd.none )
+
         Reset ->
             ( { model
                 | state = Initial
@@ -175,7 +181,9 @@ update msg model =
             ( { model | elapsedTime = model.elapsedTime + Time.second }, Cmd.none )
 
         Start ->
-            ( { model | state = Running }, Cmd.none )
+            ( { model | state = Running }
+            , Task.attempt Blurred (Dom.blur "tutor-action-button")
+            )
 
         Pause ->
             ( { model | state = Paused }, Cmd.none )
@@ -236,13 +244,13 @@ fetchContent url =
 actionButton model =
     case model.state of
         Initial ->
-            [ button [ onClick Start ] [ text "Start" ] ]
+            [ button [ onClick Start, id "tutor-action-button" ] [ text "Start" ] ]
 
         Running ->
-            [ button [ onClick Pause ] [ text "Pause" ] ]
+            [ button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ] ]
 
         Paused ->
-            [ button [ onClick Resume ] [ text "Resume" ] ]
+            [ button [ onClick Resume, id "tutor-action-button"  ] [ text "Resume" ] ]
 
         Finished ->
             [ text "Done!" ]
