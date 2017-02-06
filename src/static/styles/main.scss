@@ -1,4 +1,6 @@
 @import '~skeleton-scss/scss/skeleton.scss';
+$fa-font-path: "~font-awesome/fonts";
+@import '~font-awesome/scss/font-awesome.scss';
 
 // Colors
 // $light-grey: #e1e1e1 !default;
@@ -8,6 +10,25 @@
 // $border-color: #bbb !default;
 // $link-color: #1eaedb !default;
 // $font-color: #222 !default;
+
+
+// ---------------------
+// Header
+// ---------------------
+
+.header--logo {
+  @extend .fa;
+  @extend .fa-keyboard-o;
+  @extend .fa-4x;
+  float: left;
+  margin-right: 10px;
+}
+.header--text {
+}
+
+// ---------------------
+// Autocopmelte
+// ---------------------
 
 .autocomplete-input {
   @extend .u-full-width;
@@ -34,6 +55,30 @@
   background-color: $primary-color;
 }
 
+
+// ---------------------
+// Repo Search
+// ---------------------
+
+.repo-search-spinner {
+  @extend .fa;
+  @extend .fa-spinner;
+  @extend .fa-pulse;
+  @extend .fa-2x;
+  @extend .fa-fw;
+  float: right;
+  margin-top: -35px;
+  position: relative;
+  z-index: 2;
+  display: none;
+}
+.repo-search-spinner--loading {
+  display: inline;
+}
+
+// ---------------------
+// Tutor
+// ---------------------
 
 .tutor-text {
   white-space: pre;

@@ -3,7 +3,7 @@ module Components.RepoSearch exposing (..)
 import Autocomplete
 import Common exposing (cmd)
 import Debounce
-import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
+import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li, i)
 import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
 import Html.Events exposing (onInput, onFocus, onBlur)
 import Http
@@ -204,9 +204,13 @@ view model =
             , defaultValue model.query
             , autofocus True
             , id "repo-search-query"
-            , classList
-                [ ( "autocomplete-input", True )
-                , ( "autocomplete-input--loading", model.loading )
+            , class "autocomplete-input"
+            ]
+            []
+        , i
+            [ classList
+                [ ( "repo-search-spinner", True )
+                , ( "repo-search-spinner--loading", model.loading )
                 ]
             ]
             []

@@ -4,7 +4,7 @@ import Components.FileSearch as FileSearch
 import Components.RepoSearch as RepoSearch
 import Components.Tutor as Tutor
 import Dom
-import Html exposing (Html, Attribute, div, input, text, program, p, button, h1, h2, table, tr, td)
+import Html exposing (Html, Attribute, div, input, text, program, p, button, h1, h2, table, tr, td, i)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
 import Task
@@ -115,20 +115,21 @@ update msg model =
             case tutorMsg of
                 Tutor.Completed elapsedTime charCount errorCount ->
                     case Maybe.map2 (,) model.repoSearch.selectedRepo model.fileSearch.selectedFile of
-                          Just ( repo, file ) ->
+                        Just ( repo, file ) ->
                             let
-                                history = { repoName = repo.name
-                                          , repoBranch = repo.branch
-                                          , filePath = file.path
-                                          , elapsedTime = elapsedTime
-                                          , charCount = charCount
-                                          , errorCount = errorCount
-                                          }
+                                history =
+                                    { repoName = repo.name
+                                    , repoBranch = repo.branch
+                                    , filePath = file.path
+                                    , elapsedTime = elapsedTime
+                                    , charCount = charCount
+                                    , errorCount = errorCount
+                                    }
                             in
-                              ( model, appendHistory history )
+                                ( model, appendHistory history )
 
-                          _ ->
-                              ( model, Cmd.none )
+                        _ ->
+                            ( model, Cmd.none )
 
                 _ ->
                     let
@@ -189,7 +190,9 @@ view model =
     div [ class "container" ]
         (List.concat
             [ [ div [ class "row" ]
-                    [ h1 [] [ text "Typist" ] ]
+                    [ i [ class "header--logo" ] []
+                    , h1 [ class "header--title" ] [ text "Typist" ]
+                    ]
               ]
             , (case model.stage of
                 RepoSearch ->
@@ -217,7 +220,7 @@ view model =
                 [ h2 [] [ text "History" ]
                 , table []
                     (List.concat
-                        [ [ tr [] [ td [] [ text "Project" ], td [] [ text "File"], td [] [ text "Score" ] ] ]
+                        [ [ tr [] [ td [] [ text "Project" ], td [] [ text "File" ], td [] [ text "Score" ] ] ]
                         , (List.map
                             (\history ->
                                 tr []
