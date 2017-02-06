@@ -2,6 +2,7 @@ module Components.RepoSearch exposing (..)
 
 import Autocomplete
 import Common exposing (cmd)
+import Debounce
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li)
 import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
 import Html.Events exposing (onInput, onFocus, onBlur)
@@ -17,6 +18,7 @@ init =
     , focused = False
     , selectedRepo = Nothing
     , loading = False
+    , debouncer = Debounce.init
     }
 
 
@@ -35,6 +37,7 @@ type alias Model =
     , focused : Bool
     , selectedRepo : Maybe Repo
     , loading : Bool
+    , debouncer : Debounce.State
     }
 
 
@@ -52,6 +55,7 @@ type Msg
     | RepoSelected Repo
     | Focus
     | Blur
+    | DebounceMsg (Debounce.Msg Msg)
 
 
 fetchRepos : String -> Cmd Msg
@@ -92,6 +96,9 @@ updateConfig =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        DebounceMsg a ->
+            Debounce.update debounceConfig a model
+
         QueryChanged query ->
             case model.selectedRepo of
                 Nothing ->
@@ -173,11 +180,25 @@ viewConfig =
             }
 
 
+debounceConfig : Debounce.Config { a | debouncer : Debounce.State } Msg
+debounceConfig =
+    (Debounce.config .debouncer
+        (\model state -> { model | debouncer = state })
+        DebounceMsg
+        500
+    )
+
+
+debounce : (a -> Msg) -> (a -> Msg)
+debounce =
+    Debounce.debounce1 debounceConfig
+
+
 view : Model -> Html Msg
 view model =
     div [ class "row" ]
         [ input
-            [ onInput QueryChanged
+            [ onInput (debounce QueryChanged)
             , onFocus Focus
             , onBlur Blur
             , defaultValue model.query

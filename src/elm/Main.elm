@@ -1,10 +1,10 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Components.FileSearch as FileSearch
 import Components.RepoSearch as RepoSearch
 import Components.Tutor as Tutor
 import Dom
-import Html exposing (Html, Attribute, div, input, text, program, p, button, h1)
+import Html exposing (Html, Attribute, div, input, text, program, p, button, h1, h2, table, tr, td)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
 import Task
@@ -26,7 +26,24 @@ subscriptions model =
         [ Sub.map TutorMsg (Tutor.subscriptions model.tutor)
         , Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
         , Sub.map FileSearchMsg (FileSearch.subscriptions model.fileSearch)
+        , history LoadHistory
         ]
+
+
+type alias History =
+    { repoName : String
+    , repoBranch : String
+    , filePath : String
+    , elapsedTime : Float
+    , charCount : Int
+    , errorCount : Int
+    }
+
+
+port appendHistory : History -> Cmd msg
+
+
+port history : (List History -> msg) -> Sub msg
 
 
 type Stage
@@ -40,6 +57,7 @@ type alias Model =
     , repoSearch : RepoSearch.Model
     , fileSearch : FileSearch.Model
     , stage : Stage
+    , history : List History
     }
 
 
@@ -49,6 +67,7 @@ init =
       , repoSearch = RepoSearch.init
       , fileSearch = FileSearch.init
       , stage = RepoSearch
+      , history = []
       }
     , Cmd.none
     )
@@ -60,6 +79,7 @@ type Msg
     | FileSearchMsg FileSearch.Msg
     | NavigateTo Stage
     | Focused (Result Dom.Error ())
+    | LoadHistory (List History)
 
 
 focusOn : String -> Cmd Msg
@@ -70,6 +90,9 @@ focusOn id =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        LoadHistory history ->
+            ( { model | history = history }, Cmd.none )
+
         Focused _ ->
             ( model, Cmd.none )
 
@@ -89,11 +112,30 @@ update msg model =
                 ( { model | stage = stage }, cmd )
 
         TutorMsg tutorMsg ->
-            let
-                ( updatedTutor, tutorCmd ) =
-                    Tutor.update tutorMsg model.tutor
-            in
-                ( { model | tutor = updatedTutor }, Cmd.map TutorMsg tutorCmd )
+            case tutorMsg of
+                Tutor.Completed elapsedTime charCount errorCount ->
+                    case Maybe.map2 (,) model.repoSearch.selectedRepo model.fileSearch.selectedFile of
+                          Just ( repo, file ) ->
+                            let
+                                history = { repoName = repo.name
+                                          , repoBranch = repo.branch
+                                          , filePath = file.path
+                                          , elapsedTime = elapsedTime
+                                          , charCount = charCount
+                                          , errorCount = errorCount
+                                          }
+                            in
+                              ( model, appendHistory history )
+
+                          _ ->
+                              ( model, Cmd.none )
+
+                _ ->
+                    let
+                        ( updatedTutor, tutorCmd ) =
+                            Tutor.update tutorMsg model.tutor
+                    in
+                        ( { model | tutor = updatedTutor }, Cmd.map TutorMsg tutorCmd )
 
         RepoSearchMsg repoSearchMsg ->
             case repoSearchMsg of
@@ -169,5 +211,25 @@ view model =
                     , (Html.map TutorMsg (Tutor.view model.tutor))
                     ]
               )
+            , if List.isEmpty model.history then
+                []
+              else
+                [ h2 [] [ text "History" ]
+                , table []
+                    (List.concat
+                        [ [ tr [] [ td [] [ text "Project" ], td [] [ text "File"], td [] [ text "Score" ] ] ]
+                        , (List.map
+                            (\history ->
+                                tr []
+                                    [ td [] [ text history.repoName ]
+                                    , td [] [ text history.filePath ]
+                                    , td [] [ text (toString history.charCount) ]
+                                    ]
+                            )
+                            model.history
+                          )
+                        ]
+                    )
+                ]
             ]
         )

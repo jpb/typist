@@ -50,6 +50,7 @@ type alias Model =
 type alias File =
     { path : String
     , url : String
+    , type_ : String
     }
 
 
@@ -82,9 +83,10 @@ decodeTree : Decode.Decoder (List File)
 decodeTree =
     let
         decodeFile =
-            Decode.map2 (\p u -> { path = p, url = u })
+            Decode.map3 (\p u t -> { path = p, url = u, type_ = t })
                 (Decode.field "path" Decode.string)
                 (Decode.field "url" Decode.string)
+                (Decode.field "type" Decode.string)
     in
         Decode.at [ "tree" ] (Decode.list decodeFile)
 
@@ -135,7 +137,7 @@ update msg model =
         LoadTree response ->
             case response of
                 Ok tree ->
-                    ( { model | tree = tree, loading = False }, Cmd.none )
+                    ( { model | tree = (List.filter (\t -> t.type_ == "blob") tree), loading = False }, Cmd.none )
 
                 Err _ ->
                     ( { model | loading = False }, Cmd.none )

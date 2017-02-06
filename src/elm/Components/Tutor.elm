@@ -3,8 +3,9 @@ module Components.Tutor exposing (..)
 import Array exposing (Array)
 import Base64
 import Char
+import Common
 import Dom
-import Html exposing (Html, Attribute, div, input, text, p, strong, button)
+import Html exposing (Html, Attribute, div, input, text, p, strong, button, span)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Http
@@ -19,10 +20,11 @@ import Time exposing (Time)
 import Tuple
 
 
+rightShiftChars : Set Char
 rightShiftChars =
     Set.fromList [ 'Q', 'W', 'R', 'E', 'T', 'A', 'S', 'D', 'F', 'G', 'Z', 'X', 'C', 'V', 'B', '~', '!', '@', '#', '$', '%' ]
 
-
+leftShiftChars : Set Char
 leftShiftChars =
     Set.fromList [ 'Y', 'U', 'I', 'O', 'P', 'H', 'J', 'K', 'L', 'N', 'M', '^', '&', '*', '(', ')', '_', '+', '{', '}', '|', ':', '"', '<', '>', '?' ]
 
@@ -53,7 +55,7 @@ init =
     , lineIndex = 0
     , charIndex = 0
     , lines = Array.empty
-    , errors = 0
+    , errorCount = 0
     , keysPressed = Set.empty
     , state = Initial
     , file = File "" ""
@@ -74,7 +76,7 @@ type alias Model =
     , lines : Array String
     , lineIndex : Int
     , charIndex : Int
-    , errors : Int
+    , errorCount : Int
     , keysPressed : Set ( Int, Int )
     , state : State
     , file : File
@@ -94,8 +96,10 @@ type Msg
     | Start
     | Pause
     | Resume
+    | Restart
     | Reset
     | Blurred (Result Dom.Error ())
+    | Completed Time Int Int
 
 
 type KeyPressResult
@@ -166,6 +170,9 @@ keyPressResult model keyCoordinates =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Completed _ _ _ ->
+            ( model, Cmd.none )
+
         Blurred _ ->
             ( model, Cmd.none )
 
@@ -182,6 +189,15 @@ update msg model =
 
         Tick _ ->
             ( { model | elapsedTime = model.elapsedTime + Time.second }, Cmd.none )
+
+        Restart ->
+            let
+                ( updatedModel, cmds ) =
+                    (update Reset { model | state = Running })
+            in
+                ( updatedModel
+                , (Cmd.batch [ cmds, Task.attempt Blurred (Dom.blur "tutor-action-button") ])
+                )
 
         Start ->
             ( { model | state = Running }
@@ -225,6 +241,7 @@ update msg model =
                         | charIndex = model.charIndex + 1
                         , charCount = model.charCount + 1
                     }
+                        ! []
 
                 AdvanceLine ->
                     { model
@@ -232,17 +249,28 @@ update msg model =
                         , charIndex = 0
                         , charCount = model.charCount + 1
                     }
+                        ! []
 
                 Error ->
-                    { model | errors = model.errors + 1 }
+                    { model | errorCount = model.errorCount + 1 } ! []
 
                 Complete ->
-                    { model | lineIndex = model.lineIndex + 1, charIndex = 0, state = Finished }
+                    ( { model
+                        | lineIndex = model.lineIndex + 1
+                        , charIndex = 0
+                        , state = Finished
+                        , charCount = model.charCount + 1
+                      }
+                    , Common.cmd
+                        (Completed model.elapsedTime
+                            (model.charCount + 1)
+                            model.errorCount
+                        )
+                    )
 
                 Noop ->
-                    model
+                    model ! []
             )
-                ! []
 
 
 fetchContent : String -> Cmd Msg
@@ -253,6 +281,7 @@ fetchContent url =
         )
 
 
+actionButton : Model -> Html Msg
 actionButton model =
     case model.state of
         Initial ->
@@ -265,7 +294,7 @@ actionButton model =
             button [ onClick Resume, id "tutor-action-button" ] [ text "Resume" ]
 
         Finished ->
-            text ("Done!" ++ (calculateCharsPerMinute model.elapsedTime model.charCount))
+            button [ onClick Restart, id "tutor-action-button" ] [ text "Restart" ]
 
 
 formatTime : Time -> String
@@ -295,10 +324,14 @@ formatTime floatTime =
                 ++ (String.padLeft 2 '0' (toString seconds))
 
 
-calculateCharsPerMinute : Time -> Int -> String
+calculateCharsPerMinute : Time -> Int -> Int
 calculateCharsPerMinute time charCount =
-    (toString (truncate ((Time.inSeconds time / (toFloat charCount)) * 60)))
-        ++ " characters / minute"
+    (truncate ((Time.inSeconds time / (toFloat charCount)) * 60))
+
+
+calculateAccuracy : Int -> Int -> Int
+calculateAccuracy charCount errorCount =
+    ((charCount - errorCount) // charCount)
 
 
 view : Model -> Html Msg
@@ -338,22 +371,58 @@ view model =
             pendingChars =
                 String.slice (model.charIndex + 1) (String.length currentLine) currentLine
         in
-            div [ class "row" ]
-                [ p [] [ text "Errors: ", text (toString model.errors) ]
-                , actionButton model
-                , button [ onClick Reset ] [ text "Reset" ]
-                , p [] [ text (formatTime model.elapsedTime) ]
-                , p [] [ text (calculateCharsPerMinute model.elapsedTime model.charCount) ]
-                , div [ class "tutor-text" ]
-                    (List.concat
-                        [ List.map (\l -> p [] [ text (if l == "" then " " else l) ]) previousLines
-                        , [ p []
-                                [ text previousChars
-                                , strong [ class "tutor-active-char" ] [ text currentChar ]
-                                , text pendingChars
-                                ]
-                          ]
-                        , List.map (\l -> p [] [ text (if l == "" then " " else l) ]) pendingLines
+            div []
+                [ div [ class "row tutor-nav" ]
+                    [ actionButton model
+                    , button [ onClick Reset ] [ text "Reset" ]
+                    , span [] [ text (formatTime model.elapsedTime) ]
+                    , span []
+                        [ text
+                            ((toString (calculateCharsPerMinute model.elapsedTime model.charCount))
+                                ++ " characters per minute"
+                            )
                         ]
-                    )
+                    , span []
+                        [ text
+                            ((toString (calculateAccuracy model.charCount model.errorCount))
+                                ++ "% accuracy"
+                            )
+                        ]
+                    ]
+                , div [ class "row" ]
+                    [ div [ class "tutor-text" ]
+                        (List.concat
+                            [ List.map
+                                (\l ->
+                                    p []
+                                        [ text
+                                            (if l == "" then
+                                                " "
+                                             else
+                                                l
+                                            )
+                                        ]
+                                )
+                                previousLines
+                            , [ p []
+                                    [ text previousChars
+                                    , strong [ class "tutor-active-char" ] [ text currentChar ]
+                                    , text pendingChars
+                                    ]
+                              ]
+                            , List.map
+                                (\l ->
+                                    p []
+                                        [ text
+                                            (if l == "" then
+                                                " "
+                                             else
+                                                l
+                                            )
+                                        ]
+                                )
+                                pendingLines
+                            ]
+                        )
+                    ]
                 ]

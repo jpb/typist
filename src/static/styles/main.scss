@@ -46,3 +46,15 @@
 .tutor-active-char {
   background-color: $primary-color;
 }
+.tutor-nav {
+  button, span {
+    margin-right: 5px;
+  }
+  span {
+    padding-right: 5px;
+    border-right: 1px solid $border-color;
+    &:last-child {
+      border-right: none;
+    }
+  }
+}
