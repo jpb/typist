@@ -8,6 +8,7 @@ import Html exposing (Html, Attribute, div, input, text, program, p, button, h1,
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
 import Task
+import Metrics exposing (formatTime, calculateCharsPerMinute, calculateAccuracy)
 
 
 main : Program Never Model Msg
@@ -220,13 +221,27 @@ view model =
                 [ h2 [] [ text "History" ]
                 , table []
                     (List.concat
-                        [ [ tr [] [ td [] [ text "Project" ], td [] [ text "File" ], td [] [ text "Score" ] ] ]
+                        [ [ tr []
+                                [ td [] [ text "Project" ]
+                                , td [] [ text "File" ]
+                                , td [] [ text "Chars/Minute" ]
+                                , td [] [ text "Accuracy" ]
+                                , td [] [ text "Time" ]
+                                ]
+                          ]
                         , (List.map
                             (\history ->
                                 tr []
                                     [ td [] [ text history.repoName ]
                                     , td [] [ text history.filePath ]
-                                    , td [] [ text (toString history.charCount) ]
+                                    , td []
+                                        [ (calculateCharsPerMinute history.elapsedTime history.charCount)
+                                            |> toString
+                                            |> text
+                                        ]
+                                    , td []
+                                        [ text ((toString (calculateAccuracy history.charCount history.errorCount)) ++ "%") ]
+                                    , td [] [ text (formatTime history.elapsedTime) ]
                                     ]
                             )
                             model.history
