@@ -4,6 +4,7 @@ import Array exposing (Array)
 import Base64
 import Char
 import Common
+import Components.Error as Error exposing (httpErrorToString)
 import Dom
 import Html exposing (Html, Attribute, div, input, text, p, strong, button, span)
 import Html.Attributes exposing (..)
@@ -65,6 +66,7 @@ init =
     , loading = False
     , charCount = 0
     , flashError = False
+    , error = Nothing
     }
 
 
@@ -87,6 +89,7 @@ type alias Model =
     , loading : Bool
     , charCount : Int
     , flashError : Bool
+    , error : Maybe String
     }
 
 
@@ -240,8 +243,17 @@ update msg model =
                         Err _ ->
                             ( { model | loading = False }, Cmd.none )
 
-                Err _ ->
-                    ( { model | loading = False }, Cmd.none )
+                Err err ->
+                    let
+                        error =
+                            httpErrorToString err
+                    in
+                        ( { model
+                            | loading = False
+                            , error = Just error
+                          }
+                        , Cmd.none
+                        )
 
         DismissError ->
             ( { model | flashError = False }, Cmd.none )
@@ -401,55 +413,60 @@ view model =
             pendingChars =
                 String.slice (model.charIndex + 1) (String.length currentLine) currentLine
         in
-            div []
-                [ div [ class "row tutor-nav" ]
-                    [ actionButton model
-                    , button [ onClick Reset ] [ text "Reset" ]
-                    , span [] [ text (formatTime model.elapsedTime) ]
-                    , span []
-                        [ text
-                            ((toString (calculateCharsPerMinute model.elapsedTime model.charCount))
-                                ++ " characters per minute"
-                            )
-                        ]
-                    , span []
-                        [ text
-                            ((toString (calculateAccuracy model.charCount model.errorCount))
-                                ++ "% accuracy"
-                            )
-                        ]
-                    ]
-                , div [ class "row" ]
-                    [ div [ class "tutor-text" ]
-                        (List.concat
-                            [ List.map
-                                (\l -> p [] [ text l ])
-                                previousLines
-                            , [ p []
-                                    [ text previousChars
-                                    , span
-                                        [ classList
-                                            [ ( "tutor-active-char", True )
-                                            , ( "tutor-active-char--error", model.flashError )
-                                            ]
-                                        ]
-                                        [ text currentChar ]
-                                    , text pendingChars
-                                    ]
-                              ]
-                            , List.map
-                                (\l ->
-                                    p []
-                                        [ text
-                                            (if l == "" then
-                                                " "
-                                             else
-                                                l
-                                            )
-                                        ]
-                                )
-                                pendingLines
+            case model.error of
+                Just error ->
+                    Error.view (Error.init error)
+
+                Nothing ->
+                    div []
+                        [ div [ class "row tutor-nav" ]
+                            [ actionButton model
+                            , button [ onClick Reset ] [ text "Reset" ]
+                            , span [] [ text (formatTime model.elapsedTime) ]
+                            , span []
+                                [ text
+                                    ((toString (calculateCharsPerMinute model.elapsedTime model.charCount))
+                                        ++ " characters per minute"
+                                    )
+                                ]
+                            , span []
+                                [ text
+                                    ((toString (calculateAccuracy model.charCount model.errorCount))
+                                        ++ "% accuracy"
+                                    )
+                                ]
                             ]
-                        )
-                    ]
-                ]
+                        , div [ class "row" ]
+                            [ div [ class "tutor-text" ]
+                                (List.concat
+                                    [ List.map
+                                        (\l -> p [] [ text l ])
+                                        previousLines
+                                    , [ p []
+                                            [ text previousChars
+                                            , span
+                                                [ classList
+                                                    [ ( "tutor-active-char", True )
+                                                    , ( "tutor-active-char--error", model.flashError )
+                                                    ]
+                                                ]
+                                                [ text currentChar ]
+                                            , text pendingChars
+                                            ]
+                                      ]
+                                    , List.map
+                                        (\l ->
+                                            p []
+                                                [ text
+                                                    (if l == "" then
+                                                        " "
+                                                     else
+                                                        l
+                                                    )
+                                                ]
+                                        )
+                                        pendingLines
+                                    ]
+                                )
+                            ]
+                        ]

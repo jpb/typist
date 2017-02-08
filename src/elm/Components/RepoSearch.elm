@@ -2,7 +2,7 @@ module Components.RepoSearch exposing (..)
 
 import Autocomplete
 import Common exposing (cmd)
-import Components.Error as Error
+import Components.Error as Error exposing (httpErrorToString)
 import Debounce
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li, i)
 import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
@@ -132,21 +132,16 @@ update msg model =
                     ( { model | repos = repos, loading = False }, Cmd.none )
 
                 Err err ->
-                    case err of
-                        Http.BadUrl _ ->
-                            ( { model | loading = False, error = Just "Bad Url" }, Cmd.none )
-
-                        Http.Timeout ->
-                            ( { model | loading = False, error = Just "Timeout" }, Cmd.none )
-
-                        Http.NetworkError ->
-                            ( { model | loading = False, error = Just "Network Error" }, Cmd.none )
-
-                        Http.BadStatus response ->
-                            ( { model | loading = False, error = Just "Bad Status" }, Cmd.none )
-
-                        Http.BadPayload _ response ->
-                            ( { model | loading = False, error = Just "Bad Payload" }, Cmd.none )
+                    let
+                        error =
+                            httpErrorToString err
+                    in
+                        ( { model
+                            | loading = False
+                            , error = Just error
+                          }
+                        , Cmd.none
+                        )
 
         AutocompleteUpdate autocompleteMsg ->
             let
