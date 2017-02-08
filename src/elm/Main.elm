@@ -126,7 +126,7 @@ update msg model =
                                     , errorCount = errorCount
                                     }
                             in
-                                ( model, appendHistory history )
+                                ( { model | history = history :: model.history }, appendHistory history )
 
                         _ ->
                             ( model, Cmd.none )

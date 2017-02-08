@@ -2,6 +2,7 @@ module Components.RepoSearch exposing (..)
 
 import Autocomplete
 import Common exposing (cmd)
+import Components.Error as Error
 import Debounce
 import Html exposing (Html, Attribute, div, input, text, p, strong, ul, li, i)
 import Html.Attributes exposing (class, classList, defaultValue, autofocus, id)
@@ -19,6 +20,7 @@ init =
     , selectedRepo = Nothing
     , loading = False
     , debouncer = Debounce.init
+    , error = Nothing
     }
 
 
@@ -38,6 +40,7 @@ type alias Model =
     , selectedRepo : Maybe Repo
     , loading : Bool
     , debouncer : Debounce.State
+    , error : Maybe String
     }
 
 
@@ -100,15 +103,10 @@ update msg model =
             Debounce.update debounceConfig a model
 
         QueryChanged query ->
-            case model.selectedRepo of
-                Nothing ->
-                    if query /= model.query && String.length query > 2 then
-                        ( { model | query = query, loading = True }, fetchRepos query )
-                    else
-                        ( model, Cmd.none )
-
-                Just _ ->
-                    ( model, Cmd.none )
+            if query /= model.query && String.length query > 2 then
+                ( { model | query = query, error = Nothing, loading = True }, fetchRepos query )
+            else
+                ( model, Cmd.none )
 
         SelectRepo repoName ->
             let
@@ -133,8 +131,22 @@ update msg model =
                 Ok repos ->
                     ( { model | repos = repos, loading = False }, Cmd.none )
 
-                Err _ ->
-                    ( { model | loading = False }, Cmd.none )
+                Err err ->
+                    case err of
+                        Http.BadUrl _ ->
+                            ( { model | loading = False, error = Just "Bad Url" }, Cmd.none )
+
+                        Http.Timeout ->
+                            ( { model | loading = False, error = Just "Timeout" }, Cmd.none )
+
+                        Http.NetworkError ->
+                            ( { model | loading = False, error = Just "Network Error" }, Cmd.none )
+
+                        Http.BadStatus response ->
+                            ( { model | loading = False, error = Just "Bad Status" }, Cmd.none )
+
+                        Http.BadPayload _ response ->
+                            ( { model | loading = False, error = Just "Bad Payload" }, Cmd.none )
 
         AutocompleteUpdate autocompleteMsg ->
             let
@@ -197,29 +209,38 @@ debounce =
 view : Model -> Html Msg
 view model =
     div [ class "row" ]
-        [ input
-            [ onInput (debounce QueryChanged)
-            , onFocus Focus
-            , onBlur Blur
-            , defaultValue model.query
-            , autofocus True
-            , id "repo-search-query"
-            , class "autocomplete-input"
+        (List.concat
+            [ [ input
+                    [ onInput (debounce QueryChanged)
+                    , onFocus Focus
+                    , onBlur Blur
+                    , defaultValue model.query
+                    , autofocus True
+                    , id "repo-search-query"
+                    , class "autocomplete-input"
+                    ]
+                    []
+              , i
+                    [ classList
+                        [ ( "repo-search-spinner", True )
+                        , ( "repo-search-spinner--loading", model.loading )
+                        ]
+                    ]
+                    []
+              , Html.map
+                    AutocompleteUpdate
+                    (Autocomplete.view
+                        viewConfig
+                        10
+                        model.autocomplete
+                        model.repos
+                    )
+              ]
+            , case model.error of
+                Just error ->
+                    [ (Error.view (Error.init error)) ]
+
+                Nothing ->
+                    []
             ]
-            []
-        , i
-            [ classList
-                [ ( "repo-search-spinner", True )
-                , ( "repo-search-spinner--loading", model.loading )
-                ]
-            ]
-            []
-        , Html.map
-            AutocompleteUpdate
-            (Autocomplete.view
-                viewConfig
-                10
-                model.autocomplete
-                model.repos
-            )
-        ]
+        )

@@ -1,6 +1,9 @@
 @import '~skeleton-scss/scss/skeleton.scss';
 $fa-font-path: "~font-awesome/fonts";
 @import '~font-awesome/scss/font-awesome.scss';
+@import '~animatewithsass/_properties.scss';
+@import '~animatewithsass/_attention-seekers/_shake.scss';
+@import '~animatewithsass/_attention-seekers/_pulse.scss';
 
 // Colors
 // $light-grey: #e1e1e1 !default;
@@ -10,6 +13,7 @@ $fa-font-path: "~font-awesome/fonts";
 // $border-color: #bbb !default;
 // $link-color: #1eaedb !default;
 // $font-color: #222 !default;
+$error-color: #a94442;
 
 
 // ---------------------
@@ -81,7 +85,6 @@ $fa-font-path: "~font-awesome/fonts";
 // ---------------------
 
 .tutor-text {
-  white-space: pre;
   font-family: Monaco, monospaced;
 
   p {
@@ -90,6 +93,13 @@ $fa-font-path: "~font-awesome/fonts";
 }
 .tutor-active-char {
   background-color: $primary-color;
+}
+.tutor-active-char--error {
+  @include shake();
+  background-color: $error-color;
+}
+.tutor-action-button--initial {
+  @include pulse($count: infinite);
 }
 .tutor-nav {
   button, span {
@@ -101,5 +111,22 @@ $fa-font-path: "~font-awesome/fonts";
     &:last-child {
       border-right: none;
     }
+  }
+}
+
+
+// ---------------------
+// Error
+// ---------------------
+
+.error-text {
+  margin-top: 10px;
+  padding: 10px;
+  color: $error-color;
+  background-color: #f2dede;
+  border-color: #ebccd1;
+
+  p {
+    margin-bottom: 0;
   }
 }

@@ -18,11 +18,13 @@ import String
 import Task
 import Time exposing (Time)
 import Tuple
+import Process
 
 
 rightShiftChars : Set Char
 rightShiftChars =
     Set.fromList [ 'Q', 'W', 'R', 'E', 'T', 'A', 'S', 'D', 'F', 'G', 'Z', 'X', 'C', 'V', 'B', '~', '!', '@', '#', '$', '%' ]
+
 
 leftShiftChars : Set Char
 leftShiftChars =
@@ -62,6 +64,7 @@ init =
     , elapsedTime = 0
     , loading = False
     , charCount = 0
+    , flashError = False
     }
 
 
@@ -83,6 +86,7 @@ type alias Model =
     , elapsedTime : Time
     , loading : Bool
     , charCount : Int
+    , flashError : Bool
     }
 
 
@@ -100,6 +104,7 @@ type Msg
     | Reset
     | Blurred (Result Dom.Error ())
     | Completed Time Int Int
+    | DismissError
 
 
 type KeyPressResult
@@ -134,7 +139,12 @@ keyPressResult model keyCoordinates =
                     isCurrentChar =
                         current == String.fromChar char
                 in
-                    if isNewLine then
+                    if isLastChar then
+                        if isLastLine then
+                            Complete
+                        else
+                            AdvanceChar
+                    else if isNewLine then
                         if (Tuple.first keyCoordinates) == 13 then
                             AdvanceLine
                         else
@@ -142,22 +152,14 @@ keyPressResult model keyCoordinates =
                     else if isCurrentChar then
                         if (Set.member char leftShiftChars) then
                             if (Set.member ( 16, 1 ) model.keysPressed) then
-                                if isLastChar && isLastLine then
-                                    Complete
-                                else
-                                    AdvanceChar
+                                AdvanceChar
                             else
                                 Error
                         else if Set.member char rightShiftChars then
                             if Set.member ( 16, 2 ) model.keysPressed then
-                                if isLastChar && isLastLine then
-                                    Complete
-                                else
-                                    AdvanceChar
+                                AdvanceChar
                             else
                                 Error
-                        else if isLastChar && isLastLine then
-                            Complete
                         else
                             AdvanceChar
                     else
@@ -183,6 +185,7 @@ update msg model =
                 , lineIndex = 0
                 , charIndex = 0
                 , charCount = 0
+                , errorCount = 0
               }
             , Cmd.none
             )
@@ -213,20 +216,35 @@ update msg model =
             )
 
         SetFile path url ->
-            ( { model | file = (File path url), loading = True }, fetchContent url )
+            let
+                ( updatedModel, cmds ) =
+                    (update Reset { model | file = (File path url), loading = True })
+            in
+                ( updatedModel
+                , (Cmd.batch [ cmds, fetchContent url ])
+                )
 
         LoadContent response ->
             case response of
                 Ok base64Content ->
                     case (Base64.decode (Regex.replace Regex.All (Regex.regex "\\n") (\_ -> "") base64Content)) of
                         Ok content ->
-                            ( { model | lines = (Array.fromList (String.lines content)), loading = False }, Cmd.none )
+                            ( { model
+                                | lines =
+                                    (Array.fromList (String.lines content))
+                                , loading = False
+                              }
+                            , Cmd.none
+                            )
 
                         Err _ ->
                             ( { model | loading = False }, Cmd.none )
 
                 Err _ ->
                     ( { model | loading = False }, Cmd.none )
+
+        DismissError ->
+            ( { model | flashError = False }, Cmd.none )
 
         KeyDown keyCoordinates ->
             ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
@@ -252,7 +270,13 @@ update msg model =
                         ! []
 
                 Error ->
-                    { model | errorCount = model.errorCount + 1 } ! []
+                    { model
+                        | errorCount = model.errorCount + 1
+                        , flashError = True
+                    }
+                        ! [ Process.sleep (1000 * Time.millisecond)
+                                |> Task.perform (\_ -> DismissError)
+                          ]
 
                 Complete ->
                     ( { model
@@ -285,7 +309,7 @@ actionButton : Model -> Html Msg
 actionButton model =
     case model.state of
         Initial ->
-            button [ onClick Start, id "tutor-action-button" ] [ text "Start" ]
+            button [ onClick Start, id "tutor-action-button", class "tutor-action-button--initial" ] [ text "Start" ]
 
         Running ->
             button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ]
@@ -331,7 +355,7 @@ calculateCharsPerMinute time charCount =
 
 calculateAccuracy : Int -> Int -> Int
 calculateAccuracy charCount errorCount =
-    ((charCount - errorCount) // charCount)
+    ((charCount - errorCount) // charCount) * 100
 
 
 view : Model -> Html Msg
@@ -342,31 +366,37 @@ view model =
             ]
     else
         let
+            numberOfLines =
+                Array.length model.lines
+
+            lines =
+                Array.indexedMap
+                    (\i l ->
+                        if i + 1 == numberOfLines then
+                            l
+                        else
+                            l ++ "¶"
+                    )
+                    model.lines
+
             currentLine =
-                Maybe.withDefault "" (Array.get model.lineIndex model.lines)
+                Maybe.withDefault "" (Array.get model.lineIndex lines)
 
             previousLines =
-                Array.toList (Array.slice 0 model.lineIndex model.lines)
+                Array.toList (Array.slice 0 model.lineIndex lines)
 
             pendingLines =
                 Array.toList
                     (Array.slice (model.lineIndex + 1)
-                        (Array.length model.lines)
-                        model.lines
+                        (Array.length lines)
+                        lines
                     )
 
             previousChars =
                 String.slice 0 model.charIndex currentLine
 
             currentChar =
-                let
-                    currentChar_ =
-                        String.slice model.charIndex (model.charIndex + 1) currentLine
-                in
-                    if currentChar_ == "" then
-                        "¶"
-                    else
-                        currentChar_
+                String.slice model.charIndex (model.charIndex + 1) currentLine
 
             pendingChars =
                 String.slice (model.charIndex + 1) (String.length currentLine) currentLine
@@ -393,20 +423,17 @@ view model =
                     [ div [ class "tutor-text" ]
                         (List.concat
                             [ List.map
-                                (\l ->
-                                    p []
-                                        [ text
-                                            (if l == "" then
-                                                " "
-                                             else
-                                                l
-                                            )
-                                        ]
-                                )
+                                (\l -> p [] [ text l ])
                                 previousLines
                             , [ p []
                                     [ text previousChars
-                                    , strong [ class "tutor-active-char" ] [ text currentChar ]
+                                    , span
+                                        [ classList
+                                            [ ( "tutor-active-char", True )
+                                            , ( "tutor-active-char--error", model.flashError )
+                                            ]
+                                        ]
+                                        [ text currentChar ]
                                     , text pendingChars
                                     ]
                               ]
