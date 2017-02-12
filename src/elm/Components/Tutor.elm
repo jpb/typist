@@ -8,11 +8,10 @@ import Components.Error as Error exposing (httpErrorToString)
 import Dom
 import Html exposing (Html, Attribute, div, input, text, p, strong, button, span)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onWithOptions, on, onBlur)
 import Http
 import Json.Decode as Decode
 import Json.Decode as Json
-import KeyboardWithLocation as Keyboard
 import Metrics exposing (formatTime, calculateCharsPerMinute, calculateAccuracy)
 import Regex
 import Set exposing (Set)
@@ -40,15 +39,14 @@ type State
     | Finished
 
 
+type alias KeyCoordinates =
+    ( Int, Int )
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.state == Running then
-        Sub.batch
-            [ Keyboard.downs KeyDown
-            , Keyboard.ups KeyUp
-            , Keyboard.presses KeyPress
-            , Time.every Time.second Tick
-            ]
+        Time.every Time.second Tick
     else
         Sub.none
 
@@ -95,9 +93,9 @@ type alias Model =
 
 
 type Msg
-    = KeyDown Keyboard.KeyCoordinates
-    | KeyUp Keyboard.KeyCoordinates
-    | KeyPress Keyboard.KeyCoordinates
+    = KeyDown KeyCoordinates
+    | KeyUp KeyCoordinates
+    | KeyPress KeyCoordinates
     | SetFile String String
     | LoadContent (Result Http.Error String)
     | Tick Time
@@ -106,9 +104,11 @@ type Msg
     | Resume
     | Restart
     | Reset
-    | Blurred (Result Dom.Error ())
     | Completed Time Int Int
     | DismissError
+    | FocusInput
+    | InputFocused (Result Dom.Error ())
+    | InputBlurred
 
 
 type KeyPressResult
@@ -179,8 +179,17 @@ update msg model =
         Completed _ _ _ ->
             ( model, Cmd.none )
 
-        Blurred _ ->
+        FocusInput ->
+            ( model, Task.attempt InputFocused (Dom.focus "tutor-input") )
+
+        InputFocused _ ->
             ( model, Cmd.none )
+
+        InputBlurred ->
+            if model.state == Running then
+                (update FocusInput model)
+            else
+                ( model, Cmd.none )
 
         Reset ->
             ( { model
@@ -198,35 +207,22 @@ update msg model =
             ( { model | elapsedTime = model.elapsedTime + Time.second }, Cmd.none )
 
         Restart ->
-            let
-                ( updatedModel, cmds ) =
-                    (update Reset { model | state = Running })
-            in
-                ( updatedModel
-                , (Cmd.batch [ cmds, Task.attempt Blurred (Dom.blur "tutor-action-button") ])
-                )
+            Common.updateMap (update FocusInput) (update Reset { model | state = Running })
 
         Start ->
-            ( { model | state = Running }
-            , Task.attempt Blurred (Dom.blur "tutor-action-button")
-            )
+            Common.updateMap (update FocusInput) ( { model | state = Running }, Cmd.none )
 
         Pause ->
             ( { model | state = Paused }, Cmd.none )
 
         Resume ->
-            ( { model | state = Running }
-            , Task.attempt Blurred (Dom.blur "tutor-action-button")
-            )
+            ( model, Cmd.none )
+                |> (Common.updateMap (update FocusInput))
+                |> (Common.updateMap (\m -> ( { m | state = Running }, Cmd.none )))
 
         SetFile path url ->
-            let
-                ( updatedModel, cmds ) =
-                    (update Reset { model | file = (File path url), loading = True })
-            in
-                ( updatedModel
-                , (Cmd.batch [ cmds, fetchContent url ])
-                )
+            ( { model | file = (File path url), loading = True }, fetchContent url )
+                |> Common.updateMap (update Reset)
 
         LoadContent response ->
             case response of
@@ -266,48 +262,51 @@ update msg model =
             ( { model | keysPressed = Set.remove keyCoordinates model.keysPressed }, Cmd.none )
 
         KeyPress keyCoordinates ->
-            (case keyPressResult model keyCoordinates of
-                AdvanceChar ->
-                    { model
-                        | charIndex = model.charIndex + 1
-                        , charCount = model.charCount + 1
-                    }
-                        ! []
+            if model.state == Running then
+                (case keyPressResult model keyCoordinates of
+                    AdvanceChar ->
+                        { model
+                            | charIndex = model.charIndex + 1
+                            , charCount = model.charCount + 1
+                        }
+                            ! []
 
-                AdvanceLine ->
-                    { model
-                        | lineIndex = model.lineIndex + 1
-                        , charIndex = 0
-                        , charCount = model.charCount + 1
-                    }
-                        ! []
+                    AdvanceLine ->
+                        { model
+                            | lineIndex = model.lineIndex + 1
+                            , charIndex = 0
+                            , charCount = model.charCount + 1
+                        }
+                            ! []
 
-                Error ->
-                    { model
-                        | errorCount = model.errorCount + 1
-                        , flashError = True
-                    }
-                        ! [ Process.sleep (1000 * Time.millisecond)
-                                |> Task.perform (\_ -> DismissError)
-                          ]
+                    Error ->
+                        { model
+                            | errorCount = model.errorCount + 1
+                            , flashError = True
+                        }
+                            ! [ Process.sleep (1000 * Time.millisecond)
+                                    |> Task.perform (\_ -> DismissError)
+                              ]
 
-                Complete ->
-                    ( { model
-                        | lineIndex = model.lineIndex + 1
-                        , charIndex = 0
-                        , state = Finished
-                        , charCount = model.charCount + 1
-                      }
-                    , Common.cmd
-                        (Completed model.elapsedTime
-                            (model.charCount + 1)
-                            model.errorCount
+                    Complete ->
+                        ( { model
+                            | lineIndex = model.lineIndex + 1
+                            , charIndex = 0
+                            , state = Finished
+                            , charCount = model.charCount + 1
+                          }
+                        , Common.cmd
+                            (Completed model.elapsedTime
+                                (model.charCount + 1)
+                                model.errorCount
+                            )
                         )
-                    )
 
-                Noop ->
-                    model ! []
-            )
+                    Noop ->
+                        model ! []
+                )
+            else
+                model ! []
 
 
 fetchContent : String -> Cmd Msg
@@ -332,6 +331,14 @@ actionButton model =
 
         Finished ->
             button [ onClick Restart, id "tutor-action-button" ] [ text "Restart" ]
+
+
+keyCoordinates : Json.Decoder KeyCoordinates
+keyCoordinates =
+    Json.map2
+        (,)
+        (Json.field "keyCode" Json.int)
+        (Json.field "location" Json.int)
 
 
 view : Model -> Html Msg
@@ -414,7 +421,22 @@ view model =
                                                     , ( "tutor-active-char--error", model.flashError )
                                                     ]
                                                 ]
-                                                [ text currentChar ]
+                                                [ text currentChar
+                                                , input
+                                                    [ id "tutor-input"
+                                                    , (onWithOptions
+                                                        "keypress"
+                                                        { stopPropagation = False
+                                                        , preventDefault = True
+                                                        }
+                                                        (Json.map KeyPress keyCoordinates)
+                                                      )
+                                                    , on "keydown" (Json.map KeyDown keyCoordinates)
+                                                    , on "keyup" (Json.map KeyUp keyCoordinates)
+                                                    , onBlur InputBlurred
+                                                    ]
+                                                    []
+                                                ]
                                             , text pendingChars
                                             ]
                                       ]
