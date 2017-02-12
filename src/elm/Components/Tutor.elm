@@ -107,7 +107,7 @@ type Msg
     | Restart
     | Reset
     | Completed Time Int Int
-    | DismissError
+    | DismissError Int
     | FocusInput
     | InputFocused (Result Dom.Error ())
     | InputBlurred
@@ -260,8 +260,11 @@ update msg model =
                         , Cmd.none
                         )
 
-        DismissError ->
-            ( { model | flashError = False, error = Nothing }, Cmd.none )
+        DismissError errorCount ->
+            if errorCount == model.errorCount then
+                ( { model | flashError = False, error = Nothing }, Cmd.none )
+            else
+                ( model, Cmd.none )
 
         KeyDown keyCoordinates ->
             ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
@@ -294,7 +297,7 @@ update msg model =
                             , error = Just error
                         }
                             ! [ Process.sleep (1000 * Time.millisecond)
-                                    |> Task.perform (\_ -> DismissError)
+                                    |> Task.perform (\_ -> DismissError (model.errorCount + 1))
                               ]
 
                     Complete ->
@@ -503,6 +506,6 @@ view model =
                                     , ( "tutor-error--show", showError )
                                     ]
                                 ]
-                                (Maybe.map errorMessage model.error |> Maybe.withDefault [ text "foo"])
+                                (Maybe.map errorMessage model.error |> Maybe.withDefault [])
                             ]
                         ]
