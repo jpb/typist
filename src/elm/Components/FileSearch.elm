@@ -8,6 +8,8 @@ import Html.Events exposing (onInput, onFocus, onBlur)
 import Http
 import Json.Decode as Decode
 
+numberOfResults : Int
+numberOfResults = 10 
 
 init : Model
 init =
@@ -63,6 +65,8 @@ type Msg
     | SetRepo String String
     | Focus
     | Blur
+    | HighlightFirstFile
+    | HighlightLastFile
 
 
 fetchTree : String -> String -> Cmd Msg
@@ -101,8 +105,8 @@ updateConfig =
                     Maybe.map SelectFile maybeId
                 else
                     Nothing
-        , onTooLow = Nothing
-        , onTooHigh = Nothing
+        , onTooLow = Just HighlightFirstFile
+        , onTooHigh = Just HighlightLastFile
         , onMouseEnter = \id -> Nothing
         , onMouseLeave = \id -> Nothing
         , onMouseClick = \id -> Just <| SelectFile id
@@ -113,6 +117,12 @@ updateConfig =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        HighlightFirstFile ->
+            ( { model | autocomplete = (Autocomplete.resetToFirstItem updateConfig model.tree numberOfResults model.autocomplete) }, Cmd.none )
+
+        HighlightLastFile ->
+            ( { model | autocomplete = (Autocomplete.resetToLastItem updateConfig model.tree numberOfResults model.autocomplete) }, Cmd.none )
+
         SetRepo repo branch ->
             ( { model | repo = Just repo, loading = True }, fetchTree repo branch )
 
@@ -145,7 +155,7 @@ update msg model =
         AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autocompleteMsg 10 model.autocomplete model.tree
+                    Autocomplete.update updateConfig autocompleteMsg numberOfResults model.autocomplete model.tree
 
                 newModel =
                     { model | autocomplete = newState }
@@ -220,7 +230,7 @@ view model =
                         AutocompleteUpdate
                         (Autocomplete.view
                             viewConfig
-                            10
+                            numberOfResults
                             model.autocomplete
                             (filterTree model.query model.tree)
                         )

@@ -11,6 +11,9 @@ import Http
 import Json.Decode as Decode
 
 
+numberOfResults : Int
+numberOfResults = 10
+
 init : Model
 init =
     { query = ""
@@ -59,6 +62,8 @@ type Msg
     | Focus
     | Blur
     | DebounceMsg (Debounce.Msg Msg)
+    | HightlightFirstRepo
+    | HightlightLastRepo
 
 
 fetchRepos : String -> Cmd Msg
@@ -87,8 +92,8 @@ updateConfig =
                     Maybe.map SelectRepo maybeId
                 else
                     Nothing
-        , onTooLow = Nothing
-        , onTooHigh = Nothing
+        , onTooLow = Just HightlightFirstRepo
+        , onTooHigh = Just HightlightLastRepo
         , onMouseEnter = \id -> Nothing
         , onMouseLeave = \id -> Nothing
         , onMouseClick = \id -> Just <| SelectRepo id
@@ -99,6 +104,12 @@ updateConfig =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        HightlightFirstRepo ->
+            ( { model | autocomplete = (Autocomplete.resetToFirstItem updateConfig model.repos numberOfResults model.autocomplete) }, Cmd.none )
+
+        HightlightLastRepo ->
+            ( { model | autocomplete = (Autocomplete.resetToLastItem updateConfig model.repos numberOfResults model.autocomplete) }, Cmd.none )
+
         DebounceMsg a ->
             Debounce.update debounceConfig a model
 
@@ -146,7 +157,7 @@ update msg model =
         AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autocompleteMsg 10 model.autocomplete model.repos
+                    Autocomplete.update updateConfig autocompleteMsg numberOfResults model.autocomplete model.repos
 
                 newModel =
                     { model | autocomplete = newState }
@@ -226,7 +237,7 @@ view model =
                     AutocompleteUpdate
                     (Autocomplete.view
                         viewConfig
-                        10
+                        numberOfResults
                         model.autocomplete
                         model.repos
                     )

@@ -23,12 +23,22 @@ main =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ Sub.map TutorMsg (Tutor.subscriptions model.tutor)
-        , Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
-        , Sub.map FileSearchMsg (FileSearch.subscriptions model.fileSearch)
-        , history LoadHistory
-        ]
+    let
+        subs =
+            case model.stage of
+                Tutor ->
+                    Sub.map TutorMsg (Tutor.subscriptions model.tutor)
+
+                RepoSearch ->
+                    Sub.map RepoSearchMsg (RepoSearch.subscriptions model.repoSearch)
+
+                FileSearch ->
+                    Sub.map FileSearchMsg (FileSearch.subscriptions model.fileSearch)
+    in
+        Sub.batch
+            [ subs
+            , history LoadHistory
+            ]
 
 
 type alias History =
