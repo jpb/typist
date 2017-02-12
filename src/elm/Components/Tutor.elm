@@ -151,13 +151,10 @@ keyPressResult model keyCoordinates =
                     isCurrentChar =
                         current == String.fromChar char
                 in
-                    if isLastChar then
+                    if isNewLine then
                         if isLastLine then
                             Complete
-                        else
-                            AdvanceChar
-                    else if isNewLine then
-                        if (Tuple.first keyCoordinates) == 13 then
+                        else if (Tuple.first keyCoordinates) == 13 then
                             AdvanceLine
                         else
                             Error WrongChar
@@ -279,6 +276,7 @@ update msg model =
                         { model
                             | charIndex = model.charIndex + 1
                             , charCount = model.charCount + 1
+                            , flashError = False
                         }
                             ! []
 
