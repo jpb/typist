@@ -6,7 +6,7 @@ import Char
 import Common
 import Components.Error as Error exposing (httpErrorToString)
 import Dom
-import Html exposing (Html, Attribute, div, input, text, p, strong, button, span)
+import Html exposing (Html, Attribute, div, input, text, p, strong, button, span, i)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onWithOptions, on, onBlur)
 import Http
@@ -65,6 +65,7 @@ init =
     , loading = False
     , charCount = 0
     , flashError = False
+    , loadError = Nothing
     , error = Nothing
     }
 
@@ -88,7 +89,8 @@ type alias Model =
     , loading : Bool
     , charCount : Int
     , flashError : Bool
-    , error : Maybe String
+    , loadError : Maybe String
+    , error : Maybe Error
     }
 
 
@@ -111,10 +113,16 @@ type Msg
     | InputBlurred
 
 
+type Error
+    = WrongChar
+    | ShouldUseLeftShift
+    | ShouldUseRightShift
+
+
 type KeyPressResult
     = AdvanceChar
     | AdvanceLine
-    | Error
+    | Error Error
     | Complete
     | Noop
 
@@ -152,22 +160,22 @@ keyPressResult model keyCoordinates =
                         if (Tuple.first keyCoordinates) == 13 then
                             AdvanceLine
                         else
-                            Error
+                            Error WrongChar
                     else if isCurrentChar then
                         if (Set.member char leftShiftChars) then
                             if (Set.member ( 16, 1 ) model.keysPressed) then
                                 AdvanceChar
                             else
-                                Error
+                                Error ShouldUseLeftShift
                         else if Set.member char rightShiftChars then
                             if Set.member ( 16, 2 ) model.keysPressed then
                                 AdvanceChar
                             else
-                                Error
+                                Error ShouldUseRightShift
                         else
                             AdvanceChar
                     else
-                        Error
+                        Error WrongChar
             )
             (Array.get model.lineIndex model.lines)
         )
@@ -242,18 +250,18 @@ update msg model =
 
                 Err err ->
                     let
-                        error =
+                        loadError =
                             httpErrorToString err
                     in
                         ( { model
                             | loading = False
-                            , error = Just error
+                            , loadError = Just loadError
                           }
                         , Cmd.none
                         )
 
         DismissError ->
-            ( { model | flashError = False }, Cmd.none )
+            ( { model | flashError = False, error = Nothing }, Cmd.none )
 
         KeyDown keyCoordinates ->
             ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
@@ -279,10 +287,11 @@ update msg model =
                         }
                             ! []
 
-                    Error ->
+                    Error error ->
                         { model
                             | errorCount = model.errorCount + 1
                             , flashError = True
+                            , error = Just error
                         }
                             ! [ Process.sleep (1000 * Time.millisecond)
                                     |> Task.perform (\_ -> DismissError)
@@ -341,6 +350,25 @@ keyCoordinates =
         (Json.field "location" Json.int)
 
 
+errorMessage : Error -> List (Html Msg)
+errorMessage error =
+    case error of
+        ShouldUseLeftShift ->
+            [ text "Use "
+            , i [ class "fa fa-chevron-left" ] []
+            , text " shift"
+            ]
+
+        ShouldUseRightShift ->
+            [ text "Use "
+            , i [ class "fa fa-chevron-right" ] []
+            , text " shift"
+            ]
+
+        WrongChar ->
+            [ text "Wrong key!" ]
+
+
 view : Model -> Html Msg
 view model =
     if model.loading then
@@ -383,10 +411,26 @@ view model =
 
             pendingChars =
                 String.slice (model.charIndex + 1) (String.length currentLine) currentLine
+
+            showError =
+                Maybe.map
+                    (\e ->
+                        case e of
+                            ShouldUseLeftShift ->
+                                True
+
+                            ShouldUseRightShift ->
+                                True
+
+                            WrongChar ->
+                                False
+                    )
+                    model.error
+                    |> Maybe.withDefault False
         in
-            case model.error of
-                Just error ->
-                    Error.view (Error.init error)
+            case model.loadError of
+                Just loadError ->
+                    Error.view (Error.init loadError)
 
                 Nothing ->
                     div []
@@ -421,22 +465,21 @@ view model =
                                                     , ( "tutor-active-char--error", model.flashError )
                                                     ]
                                                 ]
-                                                [ text currentChar
-                                                , input
-                                                    [ id "tutor-input"
-                                                    , (onWithOptions
-                                                        "keypress"
-                                                        { stopPropagation = False
-                                                        , preventDefault = True
-                                                        }
-                                                        (Json.map KeyPress keyCoordinates)
-                                                      )
-                                                    , on "keydown" (Json.map KeyDown keyCoordinates)
-                                                    , on "keyup" (Json.map KeyUp keyCoordinates)
-                                                    , onBlur InputBlurred
-                                                    ]
-                                                    []
+                                                [ text currentChar ]
+                                            , input
+                                                [ id "tutor-input"
+                                                , (onWithOptions
+                                                    "keypress"
+                                                    { stopPropagation = False
+                                                    , preventDefault = True
+                                                    }
+                                                    (Json.map KeyPress keyCoordinates)
+                                                  )
+                                                , on "keydown" (Json.map KeyDown keyCoordinates)
+                                                , on "keyup" (Json.map KeyUp keyCoordinates)
+                                                , onBlur InputBlurred
                                                 ]
+                                                []
                                             , text pendingChars
                                             ]
                                       ]
@@ -454,5 +497,12 @@ view model =
                                         pendingLines
                                     ]
                                 )
+                            , span
+                                [ classList
+                                    [ ( "tutor-error", True )
+                                    , ( "tutor-error--show", showError )
+                                    ]
+                                ]
+                                (Maybe.map errorMessage model.error |> Maybe.withDefault [ text "foo"])
                             ]
                         ]

@@ -14,6 +14,8 @@ $fa-font-path: "~font-awesome/fonts";
 // $link-color: #1eaedb !default;
 // $font-color: #222 !default;
 $error-color: #a94442;
+$error-background: #f2dede;
+$error-border: #ebccd1;
 
 
 // ---------------------
@@ -95,8 +97,7 @@ $error-color: #a94442;
   background-color: $primary-color;
 }
 .tutor-active-char--error {
-  @include shake();
-  background-color: $error-color;
+  background-color: $error-background;
 }
 .tutor-action-button--initial {
   @include pulse($count: infinite);
@@ -120,7 +121,23 @@ $error-color: #a94442;
   padding: 0;
   border: none;
 }
-
+.tutor-error {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 100px;
+  padding: 20px;
+  color: $error-color;
+  background-color: $error-background;
+  border-color: $error-border;
+  text-align: center;
+  line-height: 1.2;
+}
+.tutor-error--show {
+  display: block;
+}
 
 // ---------------------
 // Error
@@ -130,8 +147,8 @@ $error-color: #a94442;
   margin-top: 10px;
   padding: 10px;
   color: $error-color;
-  background-color: #f2dede;
-  border-color: #ebccd1;
+  background-color: $error-background;
+  border-color: $error-border;
 
   p {
     margin-bottom: 0;
