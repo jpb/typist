@@ -3,12 +3,12 @@ port module Main exposing (..)
 import Components.FileSearch as FileSearch
 import Components.RepoSearch as RepoSearch
 import Components.Tutor as Tutor
+import Components.Stats as Stats
 import Dom
 import Html exposing (Html, Attribute, div, input, text, program, p, button, h1, h2, table, tr, td, i)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
 import Task
-import Metrics exposing (formatTime, calculateCharsPerMinute, calculateAccuracy)
 
 
 main : Program Never Model Msg
@@ -34,6 +34,9 @@ subscriptions model =
 
                 FileSearch ->
                     Sub.map FileSearchMsg (FileSearch.subscriptions model.fileSearch)
+
+                Stats ->
+                    Sub.batch []
     in
         Sub.batch
             [ subs
@@ -41,34 +44,26 @@ subscriptions model =
             ]
 
 
-type alias History =
-    { repoName : String
-    , repoBranch : String
-    , filePath : String
-    , elapsedTime : Float
-    , charCount : Int
-    , errorCount : Int
-    }
+port appendHistory : Stats.History -> Cmd msg
 
 
-port appendHistory : History -> Cmd msg
-
-
-port history : (List History -> msg) -> Sub msg
+port history : (List Stats.History -> msg) -> Sub msg
 
 
 type Stage
     = RepoSearch
     | FileSearch
     | Tutor
+    | Stats
 
 
 type alias Model =
     { tutor : Tutor.Model
     , repoSearch : RepoSearch.Model
     , fileSearch : FileSearch.Model
+    , stats : Stats.Model
     , stage : Stage
-    , history : List History
+    , history : List Stats.History
     }
 
 
@@ -77,6 +72,7 @@ init =
     ( { tutor = Tutor.init
       , repoSearch = RepoSearch.init
       , fileSearch = FileSearch.init
+      , stats = Stats.init
       , stage = RepoSearch
       , history = []
       }
@@ -88,9 +84,10 @@ type Msg
     = TutorMsg Tutor.Msg
     | RepoSearchMsg RepoSearch.Msg
     | FileSearchMsg FileSearch.Msg
+    | StatsMsg Stats.Msg
     | NavigateTo Stage
     | Focused (Result Dom.Error ())
-    | LoadHistory (List History)
+    | LoadHistory (List Stats.History)
 
 
 focusOn : String -> Cmd Msg
@@ -102,7 +99,11 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         LoadHistory history ->
-            ( { model | history = history }, Cmd.none )
+            let
+                ( stats, statsCmds ) =
+                    Stats.update (Stats.LoadHistory history) model.stats
+            in
+                ( { model | stats = stats }, Cmd.map StatsMsg statsCmds )
 
         Focused _ ->
             ( model, Cmd.none )
@@ -136,8 +137,13 @@ update msg model =
                                     , charCount = charCount
                                     , errorCount = errorCount
                                     }
+
+                                ( stats, statsCmd ) =
+                                    Stats.update (Stats.AppendHistory history) model.stats
                             in
-                                ( { model | history = history :: model.history }, appendHistory history )
+                                ( { model | stats = stats }
+                                , Cmd.batch [ Cmd.map StatsMsg statsCmd, appendHistory history ]
+                                )
 
                         _ ->
                             ( model, Cmd.none )
@@ -195,6 +201,13 @@ update msg model =
                     in
                         ( { model | fileSearch = fileSearch }, Cmd.map FileSearchMsg codeCmds )
 
+        StatsMsg statsMsg ->
+            let
+                ( stats, codeCmds ) =
+                    Stats.update statsMsg model.stats
+            in
+                ( { model | stats = stats }, Cmd.map StatsMsg codeCmds )
+
 
 view : Model -> Html Msg
 view model =
@@ -207,7 +220,8 @@ view model =
               ]
             , (case model.stage of
                 RepoSearch ->
-                    [ div [ class "row" ]
+                    [ button [ onClick (NavigateTo Stats) ] [ text "Stats" ]
+                    , div [ class "row" ]
                         [ p [] [ text "Search for a project on GitHub..." ] ]
                     , (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
                     ]
@@ -224,40 +238,11 @@ view model =
                     [ button [ onClick (NavigateTo FileSearch) ] [ text "↩" ]
                     , (Html.map TutorMsg (Tutor.view model.tutor))
                     ]
+
+                Stats ->
+                    [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
+                    , (Html.map StatsMsg (Stats.view model.stats))
+                    ]
               )
-            , if List.isEmpty model.history then
-                []
-              else
-                [ h2 [] [ text "History" ]
-                , table []
-                    (List.concat
-                        [ [ tr []
-                                [ td [] [ text "Project" ]
-                                , td [] [ text "File" ]
-                                , td [] [ text "Chars/Minute" ]
-                                , td [] [ text "Accuracy" ]
-                                , td [] [ text "Time" ]
-                                ]
-                          ]
-                        , (List.map
-                            (\history ->
-                                tr []
-                                    [ td [] [ text history.repoName ]
-                                    , td [] [ text history.filePath ]
-                                    , td []
-                                        [ (calculateCharsPerMinute history.elapsedTime history.charCount)
-                                            |> toString
-                                            |> text
-                                        ]
-                                    , td []
-                                        [ text ((toString (calculateAccuracy history.charCount history.errorCount)) ++ "%") ]
-                                    , td [] [ text (formatTime history.elapsedTime) ]
-                                    ]
-                            )
-                            model.history
-                          )
-                        ]
-                    )
-                ]
             ]
         )
