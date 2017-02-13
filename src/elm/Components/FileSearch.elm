@@ -8,8 +8,11 @@ import Html.Events exposing (onInput, onFocus, onBlur)
 import Http
 import Json.Decode as Decode
 
+
 numberOfResults : Int
-numberOfResults = 10 
+numberOfResults =
+    10
+
 
 init : Model
 init =
@@ -118,10 +121,28 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HighlightFirstFile ->
-            ( { model | autocomplete = (Autocomplete.resetToFirstItem updateConfig model.tree numberOfResults model.autocomplete) }, Cmd.none )
+            ( { model
+                | autocomplete =
+                    (Autocomplete.resetToFirstItem updateConfig
+                        (filterTree model.query model.tree)
+                        numberOfResults
+                        model.autocomplete
+                    )
+              }
+            , Cmd.none
+            )
 
         HighlightLastFile ->
-            ( { model | autocomplete = (Autocomplete.resetToLastItem updateConfig model.tree numberOfResults model.autocomplete) }, Cmd.none )
+            ( { model
+                | autocomplete =
+                    (Autocomplete.resetToLastItem updateConfig
+                        (filterTree model.query model.tree)
+                        numberOfResults
+                        model.autocomplete
+                    )
+              }
+            , Cmd.none
+            )
 
         SetRepo repo branch ->
             ( { model | repo = Just repo, loading = True }, fetchTree repo branch )
