@@ -178,6 +178,39 @@ keyPressResult model keyCoordinates =
         )
 
 
+dropWhile : (a -> Bool) -> List a -> List a
+dropWhile predicate list =
+    case list of
+        [] ->
+            []
+
+        x :: xs ->
+            if (predicate x) then
+                dropWhile predicate xs
+            else
+                list
+
+
+skipWhitespace : Model -> Model
+skipWhitespace model =
+    (Maybe.map
+        (\currentLine ->
+            let
+                rest =
+                    String.slice model.charIndex (String.length currentLine) currentLine
+
+                advanceChars =
+                    dropWhile (\c -> c == ' ') (String.toList rest)
+                        |> List.length
+                        |> (\l -> (String.length rest) - l)
+            in
+                { model | charIndex = model.charIndex + advanceChars }
+        )
+        (Array.get model.lineIndex model.lines)
+    )
+        |> Maybe.withDefault model
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -232,7 +265,15 @@ update msg model =
         LoadContent response ->
             case response of
                 Ok base64Content ->
-                    case (Base64.decode (Regex.replace Regex.All (Regex.regex "\\n") (\_ -> "") base64Content)) of
+                    case
+                        (Base64.decode
+                            (Regex.replace Regex.All
+                                (Regex.regex "\\n")
+                                (\_ -> "")
+                                base64Content
+                            )
+                        )
+                    of
                         Ok content ->
                             ( { model
                                 | lines =
@@ -264,10 +305,27 @@ update msg model =
                 ( model, Cmd.none )
 
         KeyDown keyCoordinates ->
-            ( { model | keysPressed = Set.insert keyCoordinates model.keysPressed }, Cmd.none )
+            let
+                ( keyCode, _ ) =
+                    keyCoordinates
+
+                keysPressed_ =
+                    Set.insert keyCoordinates model.keysPressed
+            in
+                if keyCode == 9 then
+                    -- tab
+                    let
+                        model_ =
+                            (skipWhitespace model)
+                    in
+                        ( { model_ | keysPressed = keysPressed_ }, Cmd.none )
+                else
+                    ( { model | keysPressed = keysPressed_ }, Cmd.none )
 
         KeyUp keyCoordinates ->
-            ( { model | keysPressed = Set.remove keyCoordinates model.keysPressed }, Cmd.none )
+            ( { model | keysPressed = Set.remove keyCoordinates model.keysPressed }
+            , Cmd.none
+            )
 
         KeyPress keyCoordinates ->
             if model.state == Running then
@@ -295,7 +353,11 @@ update msg model =
                             , error = Just error
                         }
                             ! [ Process.sleep (1000 * Time.millisecond)
-                                    |> Task.perform (\_ -> DismissError (model.errorCount + 1))
+                                    |> Task.perform
+                                        (\_ ->
+                                            DismissError
+                                                (model.errorCount + 1)
+                                        )
                               ]
 
                     Complete ->
@@ -331,7 +393,12 @@ actionButton : Model -> Html Msg
 actionButton model =
     case model.state of
         Initial ->
-            button [ onClick Start, id "tutor-action-button", class "tutor-action-button--initial" ] [ text "Start" ]
+            button
+                [ onClick Start
+                , id "tutor-action-button"
+                , class "tutor-action-button--initial"
+                ]
+                [ text "Start" ]
 
         Running ->
             button [ onClick Pause, id "tutor-action-button" ] [ text "Pause" ]
@@ -441,13 +508,21 @@ view model =
                             , span [] [ text (formatTime model.elapsedTime) ]
                             , span []
                                 [ text
-                                    ((toString (calculateCharsPerMinute model.elapsedTime model.charCount))
+                                    ((toString
+                                        (calculateCharsPerMinute model.elapsedTime
+                                            model.charCount
+                                        )
+                                     )
                                         ++ " characters per minute"
                                     )
                                 ]
                             , span []
                                 [ text
-                                    ((toString (calculateAccuracy model.charCount model.errorCount))
+                                    ((toString
+                                        (calculateAccuracy model.charCount
+                                            model.errorCount
+                                        )
+                                     )
                                         ++ "% accuracy"
                                     )
                                 ]
@@ -463,12 +538,21 @@ view model =
                                             , span
                                                 [ classList
                                                     [ ( "tutor-active-char", True )
-                                                    , ( "tutor-active-char--error", model.flashError )
+                                                    , ( "tutor-active-char--error"
+                                                      , model.flashError
+                                                      )
                                                     ]
                                                 ]
                                                 [ text currentChar ]
                                             , input
                                                 [ id "tutor-input"
+                                                , (onWithOptions
+                                                    "keydown"
+                                                    { stopPropagation = False
+                                                    , preventDefault = False
+                                                    }
+                                                    (Json.map KeyDown keyCoordinates)
+                                                  )
                                                 , (onWithOptions
                                                     "keypress"
                                                     { stopPropagation = False
@@ -476,8 +560,13 @@ view model =
                                                     }
                                                     (Json.map KeyPress keyCoordinates)
                                                   )
-                                                , on "keydown" (Json.map KeyDown keyCoordinates)
-                                                , on "keyup" (Json.map KeyUp keyCoordinates)
+                                                , (onWithOptions
+                                                    "keyup"
+                                                    { stopPropagation = False
+                                                    , preventDefault = True
+                                                    }
+                                                    (Json.map KeyUp keyCoordinates)
+                                                  )
                                                 , onBlur InputBlurred
                                                 ]
                                                 []

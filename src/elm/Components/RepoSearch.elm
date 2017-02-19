@@ -12,7 +12,9 @@ import Json.Decode as Decode
 
 
 numberOfResults : Int
-numberOfResults = 10
+numberOfResults =
+    10
+
 
 init : Model
 init =
@@ -68,7 +70,10 @@ type Msg
 
 fetchRepos : String -> Cmd Msg
 fetchRepos query =
-    Http.send LoadRepos (Http.get ("https://api.github.com/search/repositories?q=" ++ query) decodeRepos)
+    Http.send LoadRepos
+        (Http.get ("https://api.github.com/search/repositories?q=" ++ query)
+            decodeRepos
+        )
 
 
 decodeRepos : Decode.Decoder (List Repo)
@@ -105,17 +110,37 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HightlightFirstRepo ->
-            ( { model | autocomplete = (Autocomplete.resetToFirstItem updateConfig model.repos numberOfResults model.autocomplete) }, Cmd.none )
+            ( { model
+                | autocomplete =
+                    (Autocomplete.resetToFirstItem updateConfig
+                        model.repos
+                        numberOfResults
+                        model.autocomplete
+                    )
+              }
+            , Cmd.none
+            )
 
         HightlightLastRepo ->
-            ( { model | autocomplete = (Autocomplete.resetToLastItem updateConfig model.repos numberOfResults model.autocomplete) }, Cmd.none )
+            ( { model
+                | autocomplete =
+                    (Autocomplete.resetToLastItem updateConfig
+                        model.repos
+                        numberOfResults
+                        model.autocomplete
+                    )
+              }
+            , Cmd.none
+            )
 
         DebounceMsg a ->
             Debounce.update debounceConfig a model
 
         QueryChanged query ->
             if query /= model.query && String.length query > 2 then
-                ( { model | query = query, error = Nothing, loading = True }, fetchRepos query )
+                ( { model | query = query, error = Nothing, loading = True }
+                , fetchRepos query
+                )
             else
                 ( model, Cmd.none )
 
@@ -157,7 +182,11 @@ update msg model =
         AutocompleteUpdate autocompleteMsg ->
             let
                 ( newState, maybeMsg ) =
-                    Autocomplete.update updateConfig autocompleteMsg numberOfResults model.autocomplete model.repos
+                    Autocomplete.update updateConfig
+                        autocompleteMsg
+                        numberOfResults
+                        model.autocomplete
+                        model.repos
 
                 newModel =
                     { model | autocomplete = newState }

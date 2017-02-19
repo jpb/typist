@@ -1,3 +1,9 @@
+document.onkeydown = function(e) {
+    if (e.which === 9) {
+        e.preventDefault();
+    }
+};
+
 // pull in desired CSS/SASS files
 require( './styles/main.scss' );
 
@@ -12,3 +18,10 @@ app.ports.appendHistory.subscribe(function(h) {
 });
 
 app.ports.history.send(JSON.parse(window.localStorage.getItem('typistHistory')));
+
+
+app.ports.setConfig.subscribe(function(config) {
+    window.localStorage.setItem('typistConfig', JSON.stringify(config));
+});
+
+app.ports.config.send(JSON.parse(window.localStorage.getItem('typistConfig')));

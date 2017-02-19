@@ -5,7 +5,7 @@ import Components.RepoSearch as RepoSearch
 import Components.Tutor as Tutor
 import Components.Stats as Stats
 import Dom
-import Html exposing (Html, Attribute, div, input, text, program, p, button, h1, h2, table, tr, td, i)
+import Html exposing (Html, Attribute, div, input, text, program, button, h1, h2, table, tr, td, i)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onInput, onClick)
 import Task
@@ -126,7 +126,11 @@ update msg model =
         TutorMsg tutorMsg ->
             case tutorMsg of
                 Tutor.Completed elapsedTime charCount errorCount ->
-                    case Maybe.map2 (,) model.repoSearch.selectedRepo model.fileSearch.selectedFile of
+                    case
+                        Maybe.map2 (,)
+                            model.repoSearch.selectedRepo
+                            model.fileSearch.selectedFile
+                    of
                         Just ( repo, file ) ->
                             let
                                 history =
@@ -142,7 +146,10 @@ update msg model =
                                     Stats.update (Stats.AppendHistory history) model.stats
                             in
                                 ( { model | stats = stats }
-                                , Cmd.batch [ Cmd.map StatsMsg statsCmd, appendHistory history ]
+                                , Cmd.batch
+                                    [ Cmd.map StatsMsg statsCmd
+                                    , appendHistory history
+                                    ]
                                 )
 
                         _ ->
@@ -160,7 +167,8 @@ update msg model =
                 RepoSearch.RepoSelected repo ->
                     let
                         ( updatedFileSearch, fileSearchCmd ) =
-                            FileSearch.update (FileSearch.SetRepo repo.name repo.branch) model.fileSearch
+                            FileSearch.update (FileSearch.SetRepo repo.name repo.branch)
+                                model.fileSearch
                     in
                         ( { model
                             | stage = FileSearch
@@ -178,7 +186,9 @@ update msg model =
                         ( repoSearch, repoSearchCmds ) =
                             RepoSearch.update repoSearchMsg model.repoSearch
                     in
-                        ( { model | repoSearch = repoSearch }, Cmd.map RepoSearchMsg repoSearchCmds )
+                        ( { model | repoSearch = repoSearch }
+                        , Cmd.map RepoSearchMsg repoSearchCmds
+                        )
 
         FileSearchMsg fileSearchMsg ->
             case fileSearchMsg of
@@ -199,7 +209,9 @@ update msg model =
                         ( fileSearch, codeCmds ) =
                             FileSearch.update fileSearchMsg model.fileSearch
                     in
-                        ( { model | fileSearch = fileSearch }, Cmd.map FileSearchMsg codeCmds )
+                        ( { model | fileSearch = fileSearch }
+                        , Cmd.map FileSearchMsg codeCmds
+                        )
 
         StatsMsg statsMsg ->
             let
@@ -220,27 +232,30 @@ view model =
               ]
             , (case model.stage of
                 RepoSearch ->
-                    [ button [ onClick (NavigateTo Stats) ] [ text "Stats" ]
+                    [ button [ onClick (NavigateTo Stats) ] [ i [ class "header--stats" ] [] ]
                     , div [ class "row" ]
-                        [ p [] [ text "Search for a project on GitHub..." ] ]
+                        [ h2 [] [ text "Search for a project on GitHub..." ] ]
                     , (Html.map RepoSearchMsg (RepoSearch.view model.repoSearch))
                     ]
 
                 FileSearch ->
                     [ div [ class "row" ]
-                        [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
-                        , p [] [ text "Search for a file..." ]
+                        [ button [ onClick (NavigateTo RepoSearch) ]
+                            [ i [ class "header--left" ] [] ]
+                        , h2 [] [ text "Search for a file..." ]
                         ]
                     , (Html.map FileSearchMsg (FileSearch.view model.fileSearch))
                     ]
 
                 Tutor ->
-                    [ button [ onClick (NavigateTo FileSearch) ] [ text "↩" ]
+                    [ button [ onClick (NavigateTo FileSearch) ]
+                        [ i [ class "header--left" ] [] ]
                     , (Html.map TutorMsg (Tutor.view model.tutor))
                     ]
 
                 Stats ->
-                    [ button [ onClick (NavigateTo RepoSearch) ] [ text "↩" ]
+                    [ button [ onClick (NavigateTo RepoSearch) ]
+                        [ i [ class "header--left" ] [] ]
                     , (Html.map StatsMsg (Stats.view model.stats))
                     ]
               )

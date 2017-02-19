@@ -29,7 +29,13 @@ $error-border: #ebccd1;
   float: left;
   margin-right: 10px;
 }
-.header--text {
+.header--stats {
+  @extend .fa;
+  @extend .fa-bar-chart;
+}
+.header--left {
+  @extend .fa;
+  @extend .fa-chevron-left;
 }
 
 // ---------------------
@@ -88,6 +94,7 @@ $error-border: #ebccd1;
 
 .tutor-text {
   font-family: Monaco, monospaced;
+  white-space: pre;
 
   p {
     margin: 0;
